@@ -1,0 +1,591 @@
+<!--
+  ─────────────────────────────────────────────────────────────────────────────
+  QUERY BUILDER INTERNAL INFRASTRUCTURE — DO NOT MODIFY
+  This file is served by the local Flask server (query_builder/server.py) to
+  power the web-based graph editor. Changes here may break the graph editor,
+  corrupt scenario specs, or lose dependency data.
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Query Builder — Graph Editor</title>
+<script src="/vis-network.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0f1117;
+    --surface:    #1a1d27;
+    --surface2:   #20232f;
+    --border:     #2d3142;
+    --accent:     #f59e0b;
+    --accent-txt: #fcd34d;
+    --text:       #e2e8f0;
+    --text-dim:   #64748b;
+    --success:    #10b981;
+    --error:      #ef4444;
+    --warning:    #f59e0b;
+    --info:       #60a5fa;
+    --entry-bg:   #161820;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: Consolas, monospace; font-size: 13px; }
+
+  /* ── Layout ── */
+  #app    { display: flex; flex-direction: column; height: 100vh; }
+  #topbar { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  #body   { display: flex; flex: 1; overflow: hidden; }
+  #graph  { flex: 1; background: var(--bg); }
+  #panel  { width: 280px; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+
+  /* ── Topbar ── */
+  #topbar h1 { font-size: 13px; color: var(--accent-txt); letter-spacing: 0.05em; }
+  #topbar .dim { color: var(--text-dim); font-size: 11px; }
+  .spacer { flex: 1; }
+  #save-btn { background: var(--accent); color: #0f1117; border: none; padding: 5px 18px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: bold; border-radius: 2px; }
+  #save-btn:disabled { background: var(--border); color: var(--text-dim); cursor: default; }
+  #save-btn:hover:not(:disabled) { background: var(--accent-txt); }
+  #status-msg { font-size: 11px; padding: 3px 10px; border-radius: 2px; }
+  #status-msg.ok      { color: var(--success); }
+  #status-msg.err     { color: var(--error); }
+  #status-msg.pending { color: var(--text-dim); }
+
+  /* ── Side panel ── */
+  .panel-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .panel-section h2 { font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; color: var(--text-dim); }
+  .legend-line { width: 32px; height: 2px; flex-shrink: 0; }
+  .legend-line.chain { background: var(--accent); }
+  .legend-line.temp  { background: var(--info); border-top: 2px dashed var(--info); height: 0; }
+
+  /* Node edit form */
+  #node-form { flex: 1; overflow-y: auto; padding: 12px 14px; display: none; }
+  #node-form h2 { font-size: 10px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 10px; color: var(--text-dim); margin-bottom: 3px; }
+  .field input, .field textarea {
+    width: 100%; background: var(--entry-bg); color: var(--text);
+    border: 1px solid var(--border); padding: 5px 7px;
+    font-family: inherit; font-size: 12px; resize: vertical;
+  }
+  .field input:focus, .field textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .gives-list, .reads-list { margin-top: 4px; }
+  .tag { display: inline-block; background: var(--surface2); color: var(--text-dim); font-size: 10px; padding: 2px 6px; margin: 2px; border-radius: 2px; }
+  .tag.temp { color: var(--info); }
+  .tag.gives { color: var(--accent-txt); }
+  #apply-btn { width: 100%; background: var(--surface2); color: var(--accent-txt); border: 1px solid var(--border); padding: 6px; cursor: pointer; font-family: inherit; font-size: 12px; margin-top: 6px; }
+  #apply-btn:hover { background: var(--border); }
+
+  /* instructions */
+  #instructions { padding: 12px 14px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
+  #instructions b { color: var(--text); }
+
+  /* ── Modal ── */
+  #modal-bg {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    justify-content: center; align-items: center;
+  }
+  #modal-bg.open { display: flex; }
+  #modal {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 20px; width: 340px; max-width: 90vw;
+  }
+  #modal h3 { font-size: 12px; color: var(--accent-txt); margin-bottom: 14px; }
+  #modal .field label { color: var(--text-dim); font-size: 11px; }
+  #modal .field input { background: var(--entry-bg); color: var(--text); border: 1px solid var(--border); }
+  #modal .field input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  #modal .hint { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 14px; }
+  .modal-btns button { flex: 1; padding: 6px; border: none; cursor: pointer; font-family: inherit; font-size: 12px; }
+  #modal-confirm { background: var(--accent); color: #0f1117; font-weight: bold; }
+  #modal-confirm:hover { background: var(--accent-txt); }
+  #modal-cancel  { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+  #modal-cancel:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <h1>◈ QUERY BUILDER — Graph Editor</h1>
+    <span class="dim">Drag between nodes to add dependencies · Click an edge to delete it · Select a node to edit</span>
+    <div class="spacer"></div>
+    <span id="status-msg" class="pending"></span>
+    <button id="save-btn" disabled>Save</button>
+  </div>
+
+  <div id="body">
+    <div id="graph"></div>
+
+    <div id="panel">
+      <div class="panel-section">
+        <h2>Legend</h2>
+        <div class="legend-row"><div class="legend-line chain"></div> Extracted value chain</div>
+        <div class="legend-row"><div class="legend-line temp"></div> Temp table dependency (auto)</div>
+      </div>
+
+      <div id="instructions">
+        <b>To add a dependency:</b> hover a node until the + handle appears, then drag to another node.<br><br>
+        <b>To remove a dependency:</b> click an extracted-value edge (orange) then press Delete, or click the × that appears.<br><br>
+        <b>Temp table edges</b> (blue dashed) are auto-detected from SQL — they cannot be added or removed here.<br><br>
+        <b>To edit a query:</b> click its node.
+      </div>
+
+      <!-- Node edit form, shown when a node is selected -->
+      <div id="node-form">
+        <h2>Edit Query</h2>
+        <div class="field">
+          <label>Title</label>
+          <input type="text" id="nf-title" placeholder="Query title">
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea id="nf-desc" rows="3" placeholder="Short description"></textarea>
+        </div>
+        <div class="field">
+          <label>Gives (extracted keys)</label>
+          <div id="nf-gives" class="gives-list"></div>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <input type="text" id="nf-gives-input" placeholder="key name" style="flex:1;background:var(--entry-bg);color:var(--text);border:1px solid var(--border);padding:4px 6px;font-family:inherit;font-size:11px;">
+            <button onclick="addGive()" style="background:var(--surface2);color:var(--accent-txt);border:1px solid var(--border);padding:4px 8px;cursor:pointer;font-family:inherit;font-size:11px;">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Temp tables (auto-detected)</label>
+          <div id="nf-temps"></div>
+        </div>
+        <button id="apply-btn">Apply Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edge creation modal -->
+<div id="modal-bg">
+  <div id="modal">
+    <h3>Add Extracted Value Dependency</h3>
+    <div class="field">
+      <label>Extracted key (from upstream query)</label>
+      <input type="text" id="modal-key" placeholder="e.g. killgroupid">
+      <div class="hint">The key this upstream query writes to result.extracted[...]</div>
+    </div>
+    <div class="field">
+      <label>Binds to @variable in downstream query</label>
+      <input type="text" id="modal-param" placeholder="e.g. killgroupid">
+      <div class="hint">The @variable name in the downstream SQL that receives this value</div>
+    </div>
+    <div class="modal-btns">
+      <button id="modal-cancel">Cancel</button>
+      <button id="modal-confirm">Add Dependency</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY BUILDER INTERNAL — DO NOT MODIFY
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PALETTE = {
+  bg:        '#0f1117',
+  surface:   '#1a1d27',
+  surface2:  '#20232f',
+  border:    '#2d3142',
+  accent:    '#f59e0b',
+  accentTxt: '#fcd34d',
+  text:      '#e2e8f0',
+  textDim:   '#64748b',
+  info:      '#60a5fa',
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _spec     = null;   // ScenarioSpec dict from server
+let _network  = null;   // vis-network instance
+let _nodes    = null;   // vis DataSet
+let _edges    = null;   // vis DataSet
+let _dirty    = false;
+let _selectedNode = null;
+let _pendingEdge  = null;   // {from, to} waiting for modal
+
+// Edge type markers stored in edge data
+const CHAIN_TYPE = 'chain';
+const TEMP_TYPE  = 'temp';
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  fetchSpec();
+  document.getElementById('save-btn').addEventListener('click', saveSpec);
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-confirm').addEventListener('click', confirmEdge);
+  document.getElementById('apply-btn').addEventListener('click', applyNodeEdit);
+
+  // Allow Enter to confirm modal
+  document.getElementById('modal-bg').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmEdge();
+    if (e.key === 'Escape') closeModal();
+  });
+});
+
+function fetchSpec() {
+  setStatus('Loading...', 'pending');
+  fetch('/api/graph')
+    .then(r => r.json())
+    .then(data => { _spec = data; buildGraph(); setStatus('', 'pending'); })
+    .catch(() => setStatus('Failed to load — is the app running?', 'err'));
+}
+
+// ── Graph construction ────────────────────────────────────────────────────────
+function buildGraph() {
+  const queries = _spec.queries || [];
+
+  const nodeData = queries.map(q => ({
+    id:    q.id,
+    label: buildNodeLabel(q),
+    title: q.description || '',
+    shape: 'box',
+    font:  { face: 'Consolas', size: 12, color: PALETTE.text, multi: true },
+    color: {
+      background: PALETTE.surface2,
+      border:     PALETTE.border,
+      highlight:  { background: PALETTE.surface2, border: PALETTE.accent },
+      hover:      { background: PALETTE.surface2, border: PALETTE.accentTxt },
+    },
+    margin: { top: 10, bottom: 10, left: 14, right: 14 },
+  }));
+
+  const edgeData = buildEdgeData(queries);
+
+  _nodes = new vis.DataSet(nodeData);
+  _edges = new vis.DataSet(edgeData);
+
+  const container = document.getElementById('graph');
+  const options   = buildOptions();
+
+  if (_network) _network.destroy();
+  _network = new vis.Network(container, { nodes: _nodes, edges: _edges }, options);
+
+  _network.on('selectNode',   e => onSelectNode(e.nodes[0]));
+  _network.on('deselectNode', ()  => onDeselect());
+  _network.on('selectEdge',   e => onSelectEdge(e.edges[0]));
+  _network.on('deselectEdge', ()  => {});
+
+  // Edge creation via manipulation
+  _network.on('beforeDrawing', () => {});
+}
+
+function buildNodeLabel(q) {
+  let label = q.title || q.id;
+  const creates = (q.creates_temp_tables || []);
+  const reads   = (q.reads_temp_tables   || []);
+  if (creates.length) label += '\n<b><i>creates: ' + creates.join(', ') + '</i></b>';
+  if (reads.length)   label += '\n<i>reads: '   + reads.join(', ')   + '</i>';
+  return label;
+}
+
+function buildEdgeData(queries) {
+  const edges = [];
+  let eid = 1;
+
+  // Extracted-value chain edges (from takes declarations)
+  for (const q of queries) {
+    for (const edge of (q.takes || [])) {
+      edges.push({
+        id:     'chain_' + (eid++),
+        from:   edge.source_query_id,
+        to:     q.id,
+        label:  edge.extracted_key + ' → @' + edge.target_param,
+        type:   CHAIN_TYPE,
+        edgeData: edge,   // store original for serialisation
+        color:  { color: PALETTE.accent, highlight: PALETTE.accentTxt },
+        width:  2,
+        arrows: { to: { enabled: true, scaleFactor: 0.7 } },
+        font:   { size: 11, color: PALETTE.accentTxt, face: 'Consolas', align: 'horizontal', background: '#1e2232', strokeWidth: 0 },
+        smooth: { type: 'curvedCW', roundness: 0.2 },
+        dashes: false,
+      });
+    }
+  }
+
+  // Temp table dependency edges (auto-detected, read-only)
+  // Build creator map: #TABLE → query id
+  const creatorMap = {};
+  for (const q of queries) {
+    for (const tbl of (q.creates_temp_tables || [])) {
+      creatorMap[tbl.toUpperCase()] = q.id;
+    }
+  }
+  for (const q of queries) {
+    for (const tbl of (q.reads_temp_tables || [])) {
+      const creatorId = creatorMap[tbl.toUpperCase()];
+      if (creatorId && creatorId !== q.id) {
+        edges.push({
+          id:     'temp_' + (eid++),
+          from:   creatorId,
+          to:     q.id,
+          label:  tbl,
+          type:   TEMP_TYPE,
+          color:  { color: PALETTE.info, highlight: PALETTE.info },
+          width:  1,
+          arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+          font:   { size: 11, color: PALETTE.info, face: 'Consolas', align: 'horizontal', background: '#1e2232', strokeWidth: 0 },
+          smooth: { type: 'curvedCCW', roundness: 0.2 },
+          dashes: [4, 4],
+          selectable: false,  // temp edges cannot be selected/deleted
+        });
+      }
+    }
+  }
+
+  return edges;
+}
+
+function buildOptions() {
+  return {
+    layout: {
+      hierarchical: {
+        enabled:      true,
+        direction:    'UD',
+        sortMethod:   'directed',
+        nodeSpacing:  200,
+        levelSeparation: 140,
+      },
+    },
+    physics: { enabled: false },
+    interaction: {
+      hover:            true,
+      multiselect:      false,
+      tooltipDelay:     200,
+      navigationButtons: false,
+    },
+    manipulation: {
+      enabled: true,
+      initiallyActive: false,
+      addNode: false,
+      deleteNode: false,
+      addEdge: (edgeData, callback) => {
+        if (edgeData.from === edgeData.to) { callback(null); return; }
+        _pendingEdge = { from: edgeData.from, to: edgeData.to };
+        callback(null);  // don't add yet — wait for modal
+        openModal();
+      },
+      deleteEdge: (data, callback) => {
+        // Only allow deleting chain edges
+        const deletable = data.edges.filter(eid => {
+          const e = _edges.get(eid);
+          return e && e.type === CHAIN_TYPE;
+        });
+        if (deletable.length !== data.edges.length) {
+          setStatus('Temp table edges are auto-detected and cannot be removed here.', 'err');
+          setTimeout(() => setStatus('', 'pending'), 3000);
+        }
+        callback({ edges: deletable });
+        if (deletable.length) markDirty();
+      },
+    },
+    nodes: { borderWidth: 1 },
+    edges: { selectionWidth: 3 },
+  };
+}
+
+// ── Node selection / editing ──────────────────────────────────────────────────
+function onSelectNode(nodeId) {
+  _selectedNode = nodeId;
+  const q = (_spec.queries || []).find(q => q.id === nodeId);
+  if (!q) return;
+
+  document.getElementById('instructions').style.display = 'none';
+  const form = document.getElementById('node-form');
+  form.style.display = 'block';
+
+  document.getElementById('nf-title').value = q.title        || '';
+  document.getElementById('nf-desc').value  = q.description  || '';
+
+  // Gives tags
+  renderGives(q.gives || []);
+
+  // Temp table tags
+  const tempsDiv = document.getElementById('nf-temps');
+  tempsDiv.innerHTML = '';
+  for (const t of (q.creates_temp_tables || [])) {
+    tempsDiv.innerHTML += `<span class="tag temp">creates: ${t}</span>`;
+  }
+  for (const t of (q.reads_temp_tables || [])) {
+    tempsDiv.innerHTML += `<span class="tag temp">reads: ${t}</span>`;
+  }
+  if (!tempsDiv.innerHTML) tempsDiv.innerHTML = '<span style="color:var(--text-dim);font-size:11px">(none)</span>';
+}
+
+function renderGives(gives) {
+  const div = document.getElementById('nf-gives');
+  div.innerHTML = gives.map((k, i) =>
+    `<span class="tag gives">${k} <span onclick="removeGive(${i})" style="cursor:pointer;color:var(--error)">×</span></span>`
+  ).join('') || '<span style="color:var(--text-dim);font-size:11px">(none)</span>';
+}
+
+function addGive() {
+  const input = document.getElementById('nf-gives-input');
+  const key   = input.value.trim();
+  if (!key) return;
+  const q = (_spec.queries || []).find(q => q.id === _selectedNode);
+  if (!q) return;
+  if (!q.gives) q.gives = [];
+  q.gives.push(key);
+  renderGives(q.gives);
+  input.value = '';
+  markDirty();
+}
+
+function removeGive(index) {
+  const q = (_spec.queries || []).find(q => q.id === _selectedNode);
+  if (!q || !q.gives) return;
+  q.gives.splice(index, 1);
+  renderGives(q.gives);
+  markDirty();
+}
+
+function applyNodeEdit() {
+  const q = (_spec.queries || []).find(q => q.id === _selectedNode);
+  if (!q) return;
+  q.title       = document.getElementById('nf-title').value.trim();
+  q.description = document.getElementById('nf-desc').value.trim();
+  // Refresh node label
+  _nodes.update({ id: q.id, label: buildNodeLabel(q), title: q.description });
+  markDirty();
+  setStatus('Node updated — save to persist.', 'pending');
+}
+
+function onDeselect() {
+  _selectedNode = null;
+  document.getElementById('node-form').style.display   = 'none';
+  document.getElementById('instructions').style.display = '';
+}
+
+function onSelectEdge(edgeId) {
+  // Visual feedback only; deletion is handled by manipulation.deleteEdge
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal() {
+  document.getElementById('modal-key').value   = '';
+  document.getElementById('modal-param').value = '';
+  document.getElementById('modal-bg').classList.add('open');
+  setTimeout(() => document.getElementById('modal-key').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal-bg').classList.remove('open');
+  _pendingEdge = null;
+}
+
+function confirmEdge() {
+  if (!_pendingEdge) { closeModal(); return; }
+
+  const key   = document.getElementById('modal-key').value.trim();
+  const param = document.getElementById('modal-param').value.trim();
+
+  if (!key || !param) {
+    document.getElementById('modal-key').style.borderColor   = key   ? '' : 'var(--error)';
+    document.getElementById('modal-param').style.borderColor = param ? '' : 'var(--error)';
+    return;
+  }
+
+  // Add edge to vis
+  const newEdgeId = 'chain_' + Date.now();
+  _edges.add({
+    id:     newEdgeId,
+    from:   _pendingEdge.from,
+    to:     _pendingEdge.to,
+    label:  key + ' → @' + param,
+    type:   CHAIN_TYPE,
+    edgeData: { source_query_id: _pendingEdge.from, extracted_key: key, target_param: param },
+    color:  { color: PALETTE.accent, highlight: PALETTE.accentTxt },
+    width:  2,
+    arrows: { to: { enabled: true, scaleFactor: 0.7 } },
+    font:   { size: 11, color: PALETTE.accentTxt, face: 'Consolas', align: 'horizontal', background: '#1e2232', strokeWidth: 0 },
+    smooth: { type: 'curvedCW', roundness: 0.2 },
+    dashes: false,
+  });
+
+  // Update spec: add takes entry on the target query
+  const targetQuery = (_spec.queries || []).find(q => q.id === _pendingEdge.to);
+  if (targetQuery) {
+    if (!targetQuery.takes) targetQuery.takes = [];
+    targetQuery.takes.push({
+      source_query_id: _pendingEdge.from,
+      extracted_key:   key,
+      target_param:    param,
+    });
+  }
+
+  closeModal();
+  markDirty();
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+function saveSpec() {
+  // Rebuild takes for all queries from the current edge set before saving
+  syncEdgesToSpec();
+
+  setStatus('Saving...', 'pending');
+  document.getElementById('save-btn').disabled = true;
+
+  fetch('/api/graph', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(_spec),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) throw new Error(data.error);
+    _dirty = false;
+    document.getElementById('save-btn').disabled = true;
+    setStatus('Saved — form view updated.', 'ok');
+    setTimeout(() => setStatus('', 'pending'), 3000);
+  })
+  .catch(err => {
+    document.getElementById('save-btn').disabled = false;
+    setStatus('Save failed: ' + err.message, 'err');
+  });
+}
+
+function syncEdgesToSpec() {
+  // Clear all takes on all queries, then rebuild from current edge state
+  for (const q of (_spec.queries || [])) q.takes = [];
+
+  _edges.get().forEach(edge => {
+    if (edge.type !== CHAIN_TYPE || !edge.edgeData) return;
+    const target = (_spec.queries || []).find(q => q.id === edge.to);
+    if (target) {
+      if (!target.takes) target.takes = [];
+      target.takes.push({
+        source_query_id: edge.from,
+        extracted_key:   edge.edgeData.extracted_key,
+        target_param:    edge.edgeData.target_param,
+      });
+    }
+  });
+}
+
+// ── Dirty state ───────────────────────────────────────────────────────────────
+function markDirty() {
+  _dirty = true;
+  document.getElementById('save-btn').disabled = false;
+  setStatus('Unsaved changes', 'pending');
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-msg');
+  el.textContent  = msg;
+  el.className    = 'status-msg ' + cls;
+}
+
+// Warn before closing with unsaved changes
+window.addEventListener('beforeunload', e => {
+  if (_dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+</body>
+</html>

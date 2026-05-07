@@ -1,0 +1,33 @@
+{
+  "title": "Failed Transactions",
+  "icon": "\u2715",
+  "environments": [
+    "PROD",
+    "QA"
+  ],
+  "business_units": [
+    "Beef/Pork"
+  ],
+  "file_prefix": "failed_transactions",
+  "queries": [
+    {
+      "id": "failed_transactions",
+      "title": "Failed Transactions",
+      "description": "Checks for all failed transactions in the masterstaging table for the following poster types: InventoryAdjustment, OrderAcknowledgement, InventoryStatus, TrailerStatus, OrderDetailChange, ShipLoad, PorkHotCarcass.",
+      "sql_blocks": [
+        {
+          "label": "Detect Failed Transactions",
+          "sql": "select count(StagingId) as Count, PosterType\n    from MasterStaging\n    where TransferStatus = -3\n        and postertype in ('InventoryAdjustment',\n            'OrderAcknowledgement',\n            'InventoryStatus',\n            'TrailerStatus',\n            'OrderDetailChange',\n            'ShipLoad',\n            'PorkHotCarcass')\n        and FailReason <> ''\n    group by PosterType"
+        }
+      ],
+      "parameters": [],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    }
+  ]
+}

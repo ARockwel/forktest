@@ -1,0 +1,170 @@
+{
+  "title": "Beef Carcass Lookup",
+  "icon": "\ud83d\udc04",
+  "environments": [
+    "PROD",
+    "QA"
+  ],
+  "business_units": [
+    "Beef/Pork"
+  ],
+  "queries": [
+    {
+      "id": "backtag",
+      "title": "BackTag Carcass",
+      "description": "Looks up the BackTagCarcasses record for this carcass ID. Provides kill group ID, purchase group, CPS transfer status, and EID.",
+      "sql_blocks": [
+        {
+          "label": "BackTag Lookup",
+          "sql": "SELECT TOP 1\n        KillDate,\n        KillGroupId,\n        PurchaseGroup,\n        CpsTransferStatus,\n        Eid\n    FROM BackTagCarcasses\n    WHERE CarcassId = @carcass_id\n    ORDER BY KillDate DESC"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "carcass_id",
+          "label": "Carcass ID",
+          "default": ""
+        }
+      ],
+      "gives": [
+        "killgroupid"
+      ],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "hot",
+      "title": "Hot Carcass",
+      "description": "Looks up the HotCarcasses record for this carcass ID. Provides side, kill dates, and approval details.",
+      "sql_blocks": [
+        {
+          "label": "Hot Carcass Lookup",
+          "sql": "SELECT TOP 1\n        Side,\n        KillDate,\n        BackTagKillDate,\n        ApprovedBy,\n        ApprovedDate\n    FROM HotCarcasses\n    WHERE BackTagCarcassId = @carcass_id\n    ORDER BY KillDate DESC"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "carcass_id",
+          "label": "Carcass ID",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "epv",
+      "title": "EPV Carcass",
+      "description": "Looks up the EpVCarcasses record for this carcass ID. Provides grade, quality program, approval details, and CPS transfer status.",
+      "sql_blocks": [
+        {
+          "label": "EPV Lookup",
+          "sql": "SELECT TOP 1\n        Grade,\n        QualityProgram,\n        ApprovedBy,\n        ApprovedDate,\n        CpsTransfer\n    FROM EpVCarcasses\n    WHERE CarcassId = @carcass_id"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "carcass_id",
+          "label": "Carcass ID",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "rawinterface",
+      "title": "Raw Interface Data",
+      "description": "Searches RawInterfaceData for records whose data column contains the carcass ID. Returns MessageId, StatusId, and the raw data payload.",
+      "sql_blocks": [
+        {
+          "label": "Raw Interface Search",
+          "sql": "SELECT\n        MessageId,\n        StatusId,\n        Data\n    FROM RawInterfaceData\n    WHERE Data LIKE '%' + @carcass_id + '%'\n    AND serviceid = 'EPVService'\n    ORDER BY MessageId"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "carcass_id",
+          "label": "Carcass ID",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "killgroup",
+      "title": "Kill Group",
+      "description": "Looks up the KillGroups record using the kill group ID from the BackTag. Provides schedule group, purchase group, and head count.",
+      "sql_blocks": [
+        {
+          "label": "Kill Group Lookup",
+          "sql": "SELECT\n        ScheduleGroup,\n        PurchaseGroup,\n        HeadCount\n    FROM KillGroups\n    WHERE KillGroupId = @killgroupid"
+        }
+      ],
+      "parameters": [],
+      "gives": [
+        "ScheduleGroup"
+      ],
+      "takes": [
+        {
+          "source_query_id": "backtag",
+          "extracted_key": "killgroupid",
+          "target_param": "@killgroupid",
+          "gate": true
+        }
+      ],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "lotdetails",
+      "title": "Lot Details",
+      "description": "Looks up the LotDetails record using the schedule group from the Kill Group. Provides scheduled and received head counts.",
+      "sql_blocks": [
+        {
+          "label": "Lot Details Lookup",
+          "sql": "SELECT\n        ScheduledHeadCount,\n        ReceivedHeadCount\n    FROM LotDetails\n    WHERE ScheduleGroup = @schedulegroup"
+        }
+      ],
+      "parameters": [],
+      "gives": [],
+      "takes": [
+        {
+          "source_query_id": "killgroup",
+          "extracted_key": "ScheduleGroup",
+          "target_param": "@schedulegroup",
+          "gate": true
+        }
+      ],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    }
+  ],
+  "file_prefix": "carcass"
+}

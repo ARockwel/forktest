@@ -1,0 +1,32 @@
+{
+  "title": "IWS Message Delay",
+  "icon": "\u27f3",
+  "environments": [
+    "IWS"
+  ],
+  "business_units": [
+    "Beef/Pork"
+  ],
+  "file_prefix": "iws_delay",
+  "queries": [
+    {
+      "id": "iws_pending",
+      "title": "IWS Pending Messages",
+      "description": "Gets the count of PENDING outbound messages today, grouped by message type. WARNING: Must be connected to the IWS DB server.",
+      "sql_blocks": [
+        {
+          "label": "Check Pending Messages",
+          "sql": "SELECT MessageName, COUNT(*) AS PendingCount\n    FROM OutboundHostMessages\n    WHERE status NOT IN ('COMPLETED', 'ERROR')\n      AND CAST(createtime AS DATE) = CAST(GETDATE() AS DATE)\n    GROUP BY MessageName\n    ORDER BY PendingCount DESC"
+        }
+      ],
+      "parameters": [],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "title": "Load Won't Close",
+  "icon": "\u26a0",
+  "environments": [
+    "PROD",
+    "QA"
+  ],
+  "business_units": [
+    "Beef/Pork"
+  ],
+  "file_prefix": "load_wont_close",
+  "queries": [
+    {
+      "id": "missing_shipment",
+      "title": "Missing Shipment",
+      "description": "Checks whether a shipment exists for this delivery in shipmentStopDeliveries.",
+      "sql_blocks": [
+        {
+          "label": "Check Shipment",
+          "sql": "SELECT shipmentNumber\n    FROM shipmentStopDeliveries\n    WHERE DeliveryNumber = @delivery_number"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "delivery_number",
+          "label": "Delivery Number",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "missing_trailer",
+      "title": "Missing Trailer",
+      "description": "Checks whether the shipment linked to this delivery has a trailer assigned. Returns ok if no shipment exists.",
+      "sql_blocks": [
+        {
+          "label": "Check Trailer",
+          "sql": "SELECT s.shipmentNumber, s.trailerid\n    FROM shipments s\n    WHERE s.shipmentNumber IN (\n        SELECT shipmentNumber\n        FROM shipmentStopDeliveries\n        WHERE DeliveryNumber = @delivery_number\n    )"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "delivery_number",
+          "label": "Delivery Number",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "missing_trailer_capacity",
+      "title": "Missing Trailer Capacity",
+      "description": "Checks if the trailer attached to the shipment has a trailer capacity assigned.",
+      "sql_blocks": [
+        {
+          "label": "Check Trailer Capacity",
+          "sql": "SELECT   s.trailerid\n    FROM     shipments AS s\n    LEFT JOIN trailers AS t ON s.trailerId = t.trailerId\n    LEFT JOIN shipmentStopDeliveries AS ssd ON s.shipmentNumber = ssd.shipmentNumber\n    WHERE    ssd.DeliveryNumber = @delivery_number\n        AND    (t.trailerCapacity IS NULL OR t.trailerCapacity = 0)\n    ORDER BY s.shipmentNumber"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "delivery_number",
+          "label": "Delivery Number",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "missing_delivery_allocations",
+      "title": "Missing Delivery Allocations",
+      "description": "Checks for inventory IDs present in vwInventoryDetails that have no matching record in deliveryallocations.",
+      "sql_blocks": [
+        {
+          "label": "Check Delivery Allocations",
+          "sql": "SELECT   v.inventoryid\n    FROM     vwInventoryDetails AS v\n    WHERE    v.exitdeliverynumber = @delivery_number\n      AND    NOT EXISTS (\n                 SELECT 1\n                 FROM   deliveryallocations AS da\n                 WHERE  da.inventoryid = v.inventoryid\n             )\n    ORDER BY v.inventoryid"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "delivery_number",
+          "label": "Delivery Number",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    }
+  ]
+}
