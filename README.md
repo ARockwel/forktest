@@ -10,11 +10,44 @@ A desktop troubleshooting utility for warehouse management systems. Connects to 
 - Windows (uses Windows Authentication for SQL Server)
 - ODBC Driver 17 for SQL Server
 
-Install Python dependencies:
+---
 
-```bash
-pip install -r Requirements.txt
-```
+## Quick Start — Sync with VS Code
+
+1. **Install GIT for windows:**
+   - Open Software Portal
+   - Locate and install Git
+
+2. **Clone the repository:**
+   ```bash
+   git clone https://github.com/SF-jbs/WDT.git
+   cd WDT
+   ```
+
+3. **Open in VS Code:**
+   ```bash
+   code .
+   ```
+
+4. **Set up Python environment (recommended):**
+   - Open the Command Palette (`Ctrl+Shift+P`)
+   - Search for **Python: Create Environment** and select **Venv**
+   - Select the Python 3.10+ interpreter
+   - Wait for the virtual environment to initialize
+
+5. **Install dependencies:**
+   - Open Terminal in VS Code (`Ctrl+``)
+   - Run: `pip install -r Requirements.txt`
+
+6. **Run the application:**
+   - In VS Code Terminal, run: `python warehouse_diagnostics.py`
+   - Or use the Run button (▶) if you have a Python extension configured
+
+7. **Optional — Set up debugging:**
+   - Create `.vscode/launch.json` (VS Code will prompt you)
+   - Press `F5` to start debugging
+
+---
 
 > **Graph Editor** (optional): the Query Builder's web-based DAG editor requires Flask, which is included in `Requirements.txt`. If you skip it, the Graph Editor button will be hidden but everything else works.
 
