@@ -48,6 +48,7 @@ from scenarios.scenario_pronto_order_builder import ScenarioProntoOrderBuilder
 from scenarios.scenario_query_builder import ScenarioQueryBuilder
 from scenarios.scenario_settings      import ScenarioSettings
 from scenarios.scenario_carcass import ScenarioBeefCarcassLookup
+from scenarios.scenario_automove_check import ScenarioAutomoveCheck
 
 SCENARIOS = [
     ScenarioLoadWontClose,
@@ -60,6 +61,7 @@ SCENARIOS = [
     ScenarioCarcassLookup,
     ScenarioProntoOrderBuilder,
     ScenarioBeefCarcassLookup,
+    ScenarioAutomoveCheck,
     # Add future scenario classes here
 ]
 

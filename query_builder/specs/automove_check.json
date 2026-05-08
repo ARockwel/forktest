@@ -1,0 +1,58 @@
+{
+  "title": "Automove check",
+  "icon": "",
+  "environments": [
+    "PROD",
+    "QA"
+  ],
+  "business_units": [
+    "Beef/Pork"
+  ],
+  "queries": [
+    {
+      "id": "query_1",
+      "title": "Replen Diagnostic CTE",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": "SELECT\n        vid.PalletNumber,\n        vid.WarehouseLocationId,\n        vid.ProductId,\n        vid.ProductionDate,\n        vid.ShelfLifeDate,\n        vid.Weight,\n        vid.Qty,\n\n        -- Order constraints\n        ol.ItemMinProductionDate,\n        ol.ItemMaxProductionDate,\n        ol.ItemMinWeight,\n        ol.ItemMaxWeight,\n        ol.ItemMinSellByDate,\n\n        -- Existing task / commitment checks\n        dtExisting.DirectedTaskId AS ExistingTaskId,\n        invCommitted.DeliveryNumber AS CommittedDelivery,\n\n        ------------------------------------------------------------------\n        -- RULE FLAGS (1 = FAIL, 0 = PASS)\n        ------------------------------------------------------------------\n        CASE \n            WHEN ol.ItemMinProductionDate IS NOT NULL \n                 AND vid.ProductionDate < ol.ItemMinProductionDate \n            THEN 1 ELSE 0 \n        END AS Fail_MinProductionDate,\n\n        CASE \n            WHEN ol.ItemMaxProductionDate IS NOT NULL \n                 AND vid.ProductionDate > ol.ItemMaxProductionDate \n            THEN 1 ELSE 0 \n        END AS Fail_MaxProductionDate,\n\n        CASE \n            WHEN ol.ItemMinWeight IS NOT NULL \n                 AND vid.Weight < ol.ItemMinWeight \n            THEN 1 ELSE 0 \n        END AS Fail_MinWeight,\n\n        CASE \n            WHEN ol.ItemMaxWeight IS NOT NULL \n                 AND vid.Weight > ol.ItemMaxWeight \n            THEN 1 ELSE 0 \n        END AS Fail_MaxWeight,\n\n        CASE\n            WHEN ol.ItemMinSellByDate IS NOT NULL\n                 AND vid.ShelfLifeDate < ol.ItemMinSellByDate\n            THEN 1 ELSE 0\n        END AS Fail_MinSellByDate,\n\n        CASE\n            WHEN vid.ShelfLifeDate < CONVERT(date, GETDATE())\n            THEN 1 ELSE 0\n        END AS Fail_Expired,\n\n        CASE\n            WHEN invCommitted.PalletNumber IS NOT NULL\n            THEN 1 ELSE 0\n        END AS Fail_CommittedToAnotherDelivery,\n\n        CASE\n            WHEN dtExisting.DirectedTaskId IS NOT NULL\n            THEN 1 ELSE 0\n        END AS Fail_TaskAlreadyExists\n\n    FROM vwInventoryDetails vid WITH (READUNCOMMITTED)\n\n    ------------------------------------------------------------------\n    -- Replenishment Zone only (FIXED STRING_SPLIT)\n    ------------------------------------------------------------------\n    JOIN WarehouseAreaLocations wal\n        ON wal.LocationId = vid.WarehouseLocationId\n       AND wal.ZoneId IN (\n            SELECT CAST(ss.value AS INT)\n            FROM WorkstationApplicationSettings was\n            CROSS APPLY STRING_SPLIT(was.Value, ',') ss\n            WHERE was.PackageName = 'Protein.ShopFloor.Dashboard'\n              AND was.Code = 'ReplenishmentZones'\n       )\n\n    ------------------------------------------------------------------\n    -- Delivery / Order context\n    ------------------------------------------------------------------\n    LEFT JOIN DeliveryLines dl\n        ON dl.ProductId = vid.ProductId\n       AND dl.DeliveryNumber = @DeliveryNumber\n\n    LEFT JOIN OrderLines ol\n        ON ol.OrderLineNumber = dl.OrderLineNumber\n       AND ol.OrderNumber = (\n            SELECT OrderNumber\n            FROM Deliveries\n            WHERE DeliveryNumber = @DeliveryNumber\n       )\n\n    ------------------------------------------------------------------\n    -- Existing commitment\n    ------------------------------------------------------------------\n    LEFT JOIN vwInventoryDetails invCommitted\n        ON invCommitted.PalletNumber = vid.PalletNumber\n       AND invCommitted.DeliveryNumber IS NOT NULL\n\n    ------------------------------------------------------------------\n    -- Existing task\n    ------------------------------------------------------------------\n    LEFT JOIN DirectedTasks dtExisting\n        ON dtExisting.PalletNumber = vid.PalletNumber\n       AND dtExisting.StatusId <> 7"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "DeliveryNumber",
+          "label": "DeliveryNumber",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": true,
+      "dataframe_key": "Replen_Diagnostic_CTE",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "query_2",
+      "title": "Replen results",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": "SELECT\n    PalletNumber,\n    WarehouseLocationId,\n\n    ------------------------------------------------------------------\n    -- Diagnostic outcome\n    ------------------------------------------------------------------\n    CASE\n        WHEN\n            Fail_MinProductionDate +\n            Fail_MaxProductionDate +\n            Fail_MinWeight +\n            Fail_MaxWeight +\n            Fail_MinSellByDate +\n            Fail_Expired +\n            Fail_CommittedToAnotherDelivery +\n            Fail_TaskAlreadyExists = 0\n        THEN 'QUALIFIES'\n        ELSE 'DOES NOT QUALIFY'\n    END AS QualificationStatus,\n\n    ------------------------------------------------------------------\n    -- WHY IT FAILED (comma-separated)\n    ------------------------------------------------------------------\n    LTRIM(STUFF(\n        CONCAT(\n            CASE WHEN Fail_MinProductionDate = 1          THEN ', Production date too early'       ELSE '' END,\n            CASE WHEN Fail_MaxProductionDate = 1          THEN ', Production date too late'        ELSE '' END,\n            CASE WHEN Fail_MinWeight = 1                  THEN ', Weight below minimum'            ELSE '' END,\n            CASE WHEN Fail_MaxWeight = 1                  THEN ', Weight above maximum'            ELSE '' END,\n            CASE WHEN Fail_MinSellByDate = 1              THEN ', Sell-by date too early'           ELSE '' END,\n            CASE WHEN Fail_Expired = 1                    THEN ', Pallet expired'                  ELSE '' END,\n            CASE WHEN Fail_CommittedToAnotherDelivery = 1 THEN ', Already committed to delivery'   ELSE '' END,\n            CASE WHEN Fail_TaskAlreadyExists = 1          THEN ', Task already exists'              ELSE '' END\n        ),\n        1, 1, ''\n    )) AS FailureReasons\n\nFROM ReplenPalletDiagnostics\nORDER BY WarehouseLocationId, PalletNumber;"
+        }
+      ],
+      "parameters": [],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    }
+  ],
+  "file_prefix": "automove_check"
+}
