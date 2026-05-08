@@ -18,7 +18,7 @@ Before using the batch launcher, ensure you have these installed from the Softwa
 
 ## Quick Start — One-Click Launcher
 
-1. **Download `run_wdt.bat`** from the repository
+1. **Download `run_wdt.bat`** from the repository [HERE](https://github.com/SF-jbs/WDT/releases/tag/1.00.00_installer)
 2. **Save it to your Desktop** (or anywhere convenient)
 3. **Double-click `run_wdt.bat`**
 
