@@ -95,7 +95,7 @@ Before you can push and pull changes to the repository, configure Git with your 
    ```bash
    git pull origin main
    ```
-   - Skip steps 4-6 if you are not submitting any changes to the REPO
+   - Skip steps 4-7 if you are not submitting any changes to the REPO
 
 4. **Create a feature branch for your changes:**
    ```bash
