@@ -4,24 +4,41 @@ A desktop troubleshooting utility for warehouse management systems. Connects to 
 
 ---
 
-## Requirements
+## Prerequisites
 
-- Python 3.10+
-- Windows (uses Windows Authentication for SQL Server)
-- ODBC Driver 17 for SQL Server
+Before using the batch launcher, ensure you have these installed from the Software Portal:
+
+- **Git for Windows** — Required for cloning and updating the repository
+- **Python 3.10+** — Required to run the application
+- **ODBC Driver 17 for SQL Server** — (likely already installed if you have SSMS or VSCode database extensions)
+
+> If any of these are missing, install them from the Software Portal and restart your computer before running `run_wdt.bat`.
 
 ---
 
-## Quick Start — Sync with VS Code
+## Quick Start — One-Click Launcher
 
-1. **Install GIT for windows:**
-   - Open Software Portal
-   - Locate and install Git
+1. **Download `run_wdt.bat`** from the repository
+2. **Save it to your Desktop** (or anywhere convenient)
+3. **Double-click `run_wdt.bat`**
 
-2. **Clone the repository:**
-   - Open VScode
-   - Open a terminal if it is not open yet
-   - Paste the following commands and run them
+The batch script will automatically:
+- Clone the WDT repository (if not already present)
+- Create a Python virtual environment
+- Install all dependencies
+- Launch the application
+
+**To pin to taskbar:**
+- Right-click `run_wdt.bat` → **Send to** → **Desktop (create shortcut)**
+- Right-click the shortcut → **Pin to taskbar**
+
+---
+
+## Manual Setup — VS Code Development
+
+If you prefer to develop in VS Code instead of using the batch launcher:
+
+1. **Clone the repository:**
 
    ```bash
    mkdir C:\Users\<your username>\Workspace
