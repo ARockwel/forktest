@@ -19,12 +19,18 @@ A desktop troubleshooting utility for warehouse management systems. Connects to 
    - Locate and install Git
 
 2. **Clone the repository:**
+   - Open VScode
+   - Open a terminal if it is not open yet
+   - Paste the following commands and run them
+
    ```bash
+   mkdir C:\Users\<your username>\Workspace
+   cd C:\Users\<your username>\Workspace
    git clone https://github.com/SF-jbs/WDT.git
    cd WDT
    ```
 
-3. **Open in VS Code:**
+3. **Opens new window in VS Code for the project:**
    ```bash
    code .
    ```
@@ -33,19 +39,66 @@ A desktop troubleshooting utility for warehouse management systems. Connects to 
    - Open the Command Palette (`Ctrl+Shift+P`)
    - Search for **Python: Create Environment** and select **Venv**
    - Select the Python 3.10+ interpreter
+      - if python is not available, locate it in Software Portal and install.
+      - reboot pc after install
    - Wait for the virtual environment to initialize
 
 5. **Install dependencies:**
    - Open Terminal in VS Code (`Ctrl+``)
-   - Run: `pip install -r Requirements.txt`
+   - Run:
+    ```bash
+    pip install -r Requirements.txt
+    ```
 
 6. **Run the application:**
    - In VS Code Terminal, run: `python warehouse_diagnostics.py`
    - Or use the Run button (▶) if you have a Python extension configured
 
-7. **Optional — Set up debugging:**
-   - Create `.vscode/launch.json` (VS Code will prompt you)
-   - Press `F5` to start debugging
+---
+
+## Git Setup — Push & Pull Changes
+
+Before you can push and pull changes to the repository, configure Git with your credentials:
+
+1. **Configure your Git identity (one-time setup):**
+   - Open Terminal in VS Code (`Ctrl+``)
+   - Run:
+   ```bash
+   git config --local user.name "Your Name on GIT"
+   git config --local user.email "your.email@company.com"
+   ```
+
+2. **Authenticate with GitHub:**
+   - Use Personal Access Token (PAT)
+     - Go to [GitHub Settings → Developer Settings → Personal Access Tokens](https://github.com/settings/tokens)
+     - Create a new token with `repo` scope
+     - VS Code will prompt you to authenticate; paste the token when asked
+
+3. **Pull latest changes before starting work:**
+   ```bash
+   git pull origin main
+   ```
+
+4. **Create a feature branch for your changes:**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+5. **Make your changes and commit:**
+   - Edit files as needed
+   - Open the Source Control panel in VS Code (`Ctrl+Shift+G`)
+   - Stage changes and write a clear commit message
+   - Click **Commit**
+
+6. **Push your branch to GitHub:**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+7. **Create a Pull Request:**
+   - Go to [github.com/SF-jbs/WDT](https://github.com/SF-jbs/WDT)
+   - GitHub will show a prompt to create a PR from your branch
+   - Add a description of your changes and submit
 
 ---
 
