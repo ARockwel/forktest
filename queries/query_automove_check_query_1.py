@@ -258,13 +258,13 @@ def run(DeliveryNumber: str = "") -> QueryResult:
             return result
 
         _sql_block_1 = _SQL_BLOCK_1_EXEC
-        cursor.execute(_sql_block_1, DeliveryNumber)
+        cursor.execute(_sql_block_1, (DeliveryNumber, DeliveryNumber,))
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
         # ── Store result as named DataFrame for child queries ──────────────
         try:
             import pandas as _pd
-            result.dataframe = {"Replen_Diagnostic_CTE": _pd.DataFrame(
+            result.dataframe = {"ReplenPalletDiagnostics": _pd.DataFrame(
                 [list(r) for r in rows], columns=cols
             )}
         except Exception:

@@ -122,12 +122,7 @@ class ScenarioAutomoveCheck(tk.Frame):
             _finish_one(q_query_1, _rs["query_1"])
             if getattr(_rs["query_1"], "dataframe", None):
                 _dfs.update(_rs["query_1"].dataframe)
-
-        def _thread_1():
-            import threading as _t
-            _rs  = {}   # query_id → QueryResult
-            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
-            _rs["query_2"] = q_query_2.run()
+            _rs["query_2"] = q_query_2.run(df=_dfs if _dfs else None)
             _finish_one(q_query_2, _rs["query_2"])
             if getattr(_rs["query_2"], "dataframe", None):
                 _dfs.update(_rs["query_2"].dataframe)
@@ -135,7 +130,6 @@ class ScenarioAutomoveCheck(tk.Frame):
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()
-        _t.Thread(target=_thread_1, daemon=True).start()
 
     def _apply_result(self, qry, result):
         card = self._cards.get(qry)

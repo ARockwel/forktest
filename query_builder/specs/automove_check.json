@@ -29,7 +29,7 @@
       "gives": [],
       "takes": [],
       "creates_dataframe": true,
-      "dataframe_key": "Replen_Diagnostic_CTE",
+      "dataframe_key": "ReplenPalletDiagnostics",
       "reads_dataframe_keys": [],
       "creates_temp_tables": [],
       "reads_temp_tables": []

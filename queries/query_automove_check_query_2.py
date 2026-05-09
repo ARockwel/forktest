@@ -101,7 +101,7 @@ _SQL_BLOCK_1_EXEC = """
 """
 
 
-def run() -> QueryResult:
+def run(df: dict | None = None) -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()
     result.add_message("info", f"[{TITLE}] Running...")
@@ -114,7 +114,15 @@ def run() -> QueryResult:
             result.headline = "Query cancelled — disconnected."
             return result
 
-        _sql_block_1 = _SQL_BLOCK_1_EXEC
+        # ── DataFrame → VALUES CTE injection ────────────────────────────────
+        import re as _re
+        from common import build_values_cte as _bvc
+        _cte_parts = []
+        for _df_key in ["ReplenPalletDiagnostics"]:
+            if df and _df_key in df:
+                _cte_parts.append(_bvc(df[_df_key], _df_key).removeprefix("WITH "))
+        _cte_prefix = ("WITH " + ",\n".join(_cte_parts) + "\n") if _cte_parts else ""
+        _sql_block_1 = _cte_prefix + _SQL_BLOCK_1_EXEC
         cursor.execute(_sql_block_1)
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
