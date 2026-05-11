@@ -41,7 +41,7 @@
       "sql_blocks": [
         {
           "label": "Block 1",
-          "sql": "SELECT\n    PalletNumber,\n    WarehouseLocationId,\n\n    ------------------------------------------------------------------\n    -- Diagnostic outcome\n    ------------------------------------------------------------------\n    CASE\n        WHEN\n            Fail_MinProductionDate +\n            Fail_MaxProductionDate +\n            Fail_MinWeight +\n            Fail_MaxWeight +\n            Fail_MinSellByDate +\n            Fail_Expired +\n            Fail_CommittedToAnotherDelivery +\n            Fail_TaskAlreadyExists = 0\n        THEN 'QUALIFIES'\n        ELSE 'DOES NOT QUALIFY'\n    END AS QualificationStatus,\n\n    ------------------------------------------------------------------\n    -- WHY IT FAILED (comma-separated)\n    ------------------------------------------------------------------\n    LTRIM(STUFF(\n        CONCAT(\n            CASE WHEN Fail_MinProductionDate = 1          THEN ', Production date too early'       ELSE '' END,\n            CASE WHEN Fail_MaxProductionDate = 1          THEN ', Production date too late'        ELSE '' END,\n            CASE WHEN Fail_MinWeight = 1                  THEN ', Weight below minimum'            ELSE '' END,\n            CASE WHEN Fail_MaxWeight = 1                  THEN ', Weight above maximum'            ELSE '' END,\n            CASE WHEN Fail_MinSellByDate = 1              THEN ', Sell-by date too early'           ELSE '' END,\n            CASE WHEN Fail_Expired = 1                    THEN ', Pallet expired'                  ELSE '' END,\n            CASE WHEN Fail_CommittedToAnotherDelivery = 1 THEN ', Already committed to delivery'   ELSE '' END,\n            CASE WHEN Fail_TaskAlreadyExists = 1          THEN ', Task already exists'              ELSE '' END\n        ),\n        1, 1, ''\n    )) AS FailureReasons\n\nFROM ReplenPalletDiagnostics\nORDER BY WarehouseLocationId, PalletNumber;"
+          "sql": "SELECT\n    PalletNumber,\n    CASE\n        WHEN MAX(\n            Fail_MinProductionDate +\n            Fail_MaxProductionDate +\n            Fail_MinWeight +\n            Fail_MaxWeight +\n            Fail_MinSellByDate +\n            Fail_Expired +\n            Fail_CommittedToAnotherDelivery +\n            Fail_TaskAlreadyExists\n        ) = 0\n        THEN 'QUALIFIES'\n        ELSE 'DOES NOT QUALIFY'\n    END AS QualificationStatus,\n\n    LTRIM(STUFF(\n        CONCAT(\n            CASE WHEN MAX(Fail_MinProductionDate) = 1          THEN ', Production date too early'      ELSE '' END,\n            CASE WHEN MAX(Fail_MaxProductionDate) = 1          THEN ', Production date too late'       ELSE '' END,\n            CASE WHEN MAX(Fail_MinWeight) = 1                  THEN ', Weight below minimum'           ELSE '' END,\n            CASE WHEN MAX(Fail_MaxWeight) = 1                  THEN ', Weight above maximum'           ELSE '' END,\n            CASE WHEN MAX(Fail_MinSellByDate) = 1              THEN ', Sell-by date too early'         ELSE '' END,\n            CASE WHEN MAX(Fail_Expired) = 1                    THEN ', Pallet expired'                 ELSE '' END,\n            CASE WHEN MAX(Fail_CommittedToAnotherDelivery) = 1 THEN ', Already committed to delivery' ELSE '' END,\n            CASE WHEN MAX(Fail_TaskAlreadyExists) = 1          THEN ', Task already exists'            ELSE '' END\n        ),\n        1, 1, ''\n    )) AS FailureReasons\n\nFROM ReplenPalletDiagnostics\nGROUP BY PalletNumber\nORDER BY PalletNumber;"
         }
       ],
       "parameters": [],
@@ -49,7 +49,9 @@
       "takes": [],
       "creates_dataframe": false,
       "dataframe_key": "",
-      "reads_dataframe_keys": [],
+      "reads_dataframe_keys": [
+        "ReplenPalletDiagnostics"
+      ],
       "creates_temp_tables": [],
       "reads_temp_tables": []
     }

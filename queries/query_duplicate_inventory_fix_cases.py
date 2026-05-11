@@ -8,70 +8,91 @@ queries/query_duplicate_inventory_fix_cases.py
 
 from common import QueryResult
 from db import db
-
 TITLE       = "Fix Script — Move Duplicate Cases to LVADJ"
 DESCRIPTION = (
-    "Generates a SQL UPDATE script to move duplicate InventoryCase records "
-    "to the LVADJ location. Copy the script and run it in SSMS."
+    "Generates a SQL UPDATE script to move duplicate InventoryCase records to the LVADJ location."
 )
 
-# Pulls the plant name and server so the generated script is self-documenting
 # Get Plant/Server
 SQL_BLOCK_1 = """
     SELECT TOP 1
-        p.Description AS PlantName,
-        @@SERVERNAME  AS ServerName
-    FROM Plants p
-    JOIN InventoryCases ic WITH (READUNCOMMITTED)
-        ON ic.PlantCode = p.PlantCode
+            p.Description AS PlantName,
+            @@SERVERNAME  AS ServerName
+        FROM Plants p
+        JOIN InventoryCases ic WITH (READUNCOMMITTED)
+            ON ic.PlantCode = p.PlantCode
 """
-_SQL_BLOCK_1_EXEC = SQL_BLOCK_1
 
-# Selects only the stale duplicate InventoryIds (not the keeper).
-# maxinvid <> InventoryId means: this row is NOT the highest (current) copy.
-# The WarehouseAreas join confirms the location is still an active area.
+_SQL_BLOCK_1_EXEC = """
+    SELECT TOP 1
+            p.Description AS PlantName,
+            @?  AS ServerName
+        FROM Plants p
+        JOIN InventoryCases ic WITH (READUNCOMMITTED)
+            ON ic.PlantCode = p.PlantCode
+"""
+
 # Get Duplicate IDs
 SQL_BLOCK_2 = """
     SELECT m.InventoryId
-    FROM #MaxInvID m
-    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-        ON wal.LocationId = m.WarehouseLocationId
-    JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-        ON  wa.WarehouseId = wal.WarehouseId
-        AND wa.AreaId      = wal.AreaId
-        AND wa.IsAvailable = 1
-    WHERE m.maxinvid <> m.InventoryId
-      AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-    ORDER BY m.InventoryId
+        FROM MaxInvIDResults m
+        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
+            ON wal.LocationId = m.WarehouseLocationId
+        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
+            ON  wa.WarehouseId = wal.WarehouseId
+            AND wa.AreaId      = wal.AreaId
+            AND wa.IsAvailable = 1
+        WHERE m.maxinvid <> m.InventoryId
+          AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
+        ORDER BY m.InventoryId
 """
-_SQL_BLOCK_2_EXEC = SQL_BLOCK_2
+
+_SQL_BLOCK_2_EXEC = """
+    SELECT m.InventoryId
+        FROM MaxInvIDResults m
+        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
+            ON wal.LocationId = m.WarehouseLocationId
+        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
+            ON  wa.WarehouseId = wal.WarehouseId
+            AND wa.AreaId      = wal.AreaId
+            AND wa.IsAvailable = 1
+        WHERE m.maxinvid <> m.InventoryId
+          AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
+        ORDER BY m.InventoryId
+"""
 
 
-def run(df: dict | None = None) -> QueryResult:
+def run(SERVERNAME: str = "", df: dict | None = None) -> QueryResult:
     result = QueryResult()
-    result.add_message("info", f"[{TITLE}] Generating fix script for duplicate InventoryCases...")
+    result.sql = SQL_BLOCK_2.strip()\
+    .replace("@SERVERNAME", f'\"{SERVERNAME}\"')
+    result.add_message("info", f"[{TITLE}] Running...")
 
     try:
         cursor = db.conn.cursor()
 
-        # Run the header query first to get plant/server info for the script comments
-        cursor.execute(SQL_BLOCK_1)
-        header_row = cursor.fetchone()
-        plant  = header_row[0] if header_row else "Unknown Plant"
-        server = header_row[1] if header_row else "Unknown Server"
+        if getattr(db, "cancelled", False):
+            result.status  = "error"
+            result.headline = "Query cancelled — disconnected."
+            return result
 
-        # Inject MAXINVID as a VALUES CTE when df is provided (parallel execution path).
-        # Without df the query falls back to reading the live #MaxInvID session temp table.
-        _sql_ids = _SQL_BLOCK_2_EXEC
-        if df and "MAXINVID" in df:
-            import re as _re
-            from common import build_values_cte as _bvc
-            _cte = _bvc(df["MAXINVID"], "MAXINVID")
-            _sql_ids = _cte + "\n" + _re.sub(r'#MaxInvID\b', 'MAXINVID', _sql_ids, flags=_re.IGNORECASE)
+        # ── DataFrame → VALUES CTE injection ────────────────────────────────
+        import re as _re
+        from common import build_values_cte as _bvc
+        _cte_parts = []
+        for _df_key in ["MaxInvID", "MaxInvIDResults"]:
+            if df and _df_key in df:
+                _cte_parts.append(_bvc(df[_df_key], _df_key).removeprefix("WITH "))
+        _cte_prefix = ("WITH " + ",\n".join(_cte_parts) + "\n") if _cte_parts else ""
+        _sql_block_1 = _cte_prefix + _SQL_BLOCK_1_EXEC
+        cursor.execute(_sql_block_1, SERVERNAME)
+        while cursor.nextset():
+            pass
+        _sql_block_2 = _cte_prefix + _SQL_BLOCK_2_EXEC
+        cursor.execute(_sql_block_2)
+        rows = cursor.fetchall()
+        cols = [col[0] for col in cursor.description]
 
-        # Collect all stale InventoryIds to include in the UPDATE statement
-        cursor.execute(_sql_ids)
-        ids = [str(row[0]) for row in cursor.fetchall()]
     except Exception as exc:
         result.success  = False
         result.status   = "error"
@@ -79,44 +100,14 @@ def run(df: dict | None = None) -> QueryResult:
         result.add_message("error", result.headline)
         return result
 
-    if not ids:
-        # #MaxInvID had rows but none need fixing — already cleaned or all in LVADJ
+    if not rows:
         result.status   = "ok"
-        result.headline = "No duplicate records found — no script needed."
+        result.headline = "No records found."
         result.add_message("success", f"  ✔ {TITLE}: {result.headline}")
-        return result
-
-    # Build the UPDATE script as a list of lines stored in result.data.
-    # The result card displays these lines and provides a Copy button.
-    # BEGIN TRAN / COMMIT / ROLLBACK pattern lets the analyst verify before committing.
-    # LVADJ is the adjustment location — moving duplicates here takes them out of
-    # active picking/shipping without permanently deleting the record.
-    lines = [
-        f"-- {plant}",
-        f"-- {server}",
-        "",
-        "BEGIN TRAN t1",
-        "",
-        "UPDATE InventoryCases",
-        "    SET WarehouseLocationId = 'LVADJ',",
-        "        ModifiedBy          = 'DuplicatedJob',",
-        "        ModifiedDate        = GETDATE()",
-        "WHERE InventoryId IN (",
-    ]
-    for i, inv_id in enumerate(ids):
-        # Add a trailing comma after every ID except the last
-        comma = "," if i < len(ids) - 1 else ""
-        lines.append(f"    '{inv_id}'{comma}")
-    lines += [
-        ")",
-        "",
-        "-- COMMIT TRAN t1",
-        "-- ROLLBACK TRAN t1",
-    ]
-
-    result.status   = "issues_found"
-    result.headline = f"Script generated for {len(ids)} duplicate record(s). Copy and run in SSMS."
-    result.data     = lines
-    result.add_message("warning", f"  ⚠ {result.headline}")
+    else:
+        result.status   = "issues_found"
+        result.headline = f"{len(rows)} record(s) found."
+        result.data     = [" | ".join(str(v) for v in row) for row in rows]
+        result.add_message("warning", f"  ⚠ {result.headline}")
 
     return result

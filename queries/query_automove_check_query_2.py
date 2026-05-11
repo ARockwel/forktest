@@ -17,13 +17,8 @@ DESCRIPTION = (
 SQL_BLOCK_1 = """
     SELECT
         PalletNumber,
-        WarehouseLocationId,
-
-        ------------------------------------------------------------------
-        -- Diagnostic outcome
-        ------------------------------------------------------------------
         CASE
-            WHEN
+            WHEN MAX(
                 Fail_MinProductionDate +
                 Fail_MaxProductionDate +
                 Fail_MinWeight +
@@ -31,42 +26,36 @@ SQL_BLOCK_1 = """
                 Fail_MinSellByDate +
                 Fail_Expired +
                 Fail_CommittedToAnotherDelivery +
-                Fail_TaskAlreadyExists = 0
+                Fail_TaskAlreadyExists
+            ) = 0
             THEN 'QUALIFIES'
             ELSE 'DOES NOT QUALIFY'
         END AS QualificationStatus,
 
-        ------------------------------------------------------------------
-        -- WHY IT FAILED (comma-separated)
-        ------------------------------------------------------------------
         LTRIM(STUFF(
             CONCAT(
-                CASE WHEN Fail_MinProductionDate = 1          THEN ', Production date too early'       ELSE '' END,
-                CASE WHEN Fail_MaxProductionDate = 1          THEN ', Production date too late'        ELSE '' END,
-                CASE WHEN Fail_MinWeight = 1                  THEN ', Weight below minimum'            ELSE '' END,
-                CASE WHEN Fail_MaxWeight = 1                  THEN ', Weight above maximum'            ELSE '' END,
-                CASE WHEN Fail_MinSellByDate = 1              THEN ', Sell-by date too early'           ELSE '' END,
-                CASE WHEN Fail_Expired = 1                    THEN ', Pallet expired'                  ELSE '' END,
-                CASE WHEN Fail_CommittedToAnotherDelivery = 1 THEN ', Already committed to delivery'   ELSE '' END,
-                CASE WHEN Fail_TaskAlreadyExists = 1          THEN ', Task already exists'              ELSE '' END
+                CASE WHEN MAX(Fail_MinProductionDate) = 1          THEN ', Production date too early'      ELSE '' END,
+                CASE WHEN MAX(Fail_MaxProductionDate) = 1          THEN ', Production date too late'       ELSE '' END,
+                CASE WHEN MAX(Fail_MinWeight) = 1                  THEN ', Weight below minimum'           ELSE '' END,
+                CASE WHEN MAX(Fail_MaxWeight) = 1                  THEN ', Weight above maximum'           ELSE '' END,
+                CASE WHEN MAX(Fail_MinSellByDate) = 1              THEN ', Sell-by date too early'         ELSE '' END,
+                CASE WHEN MAX(Fail_Expired) = 1                    THEN ', Pallet expired'                 ELSE '' END,
+                CASE WHEN MAX(Fail_CommittedToAnotherDelivery) = 1 THEN ', Already committed to delivery' ELSE '' END,
+                CASE WHEN MAX(Fail_TaskAlreadyExists) = 1          THEN ', Task already exists'            ELSE '' END
             ),
             1, 1, ''
         )) AS FailureReasons
 
     FROM ReplenPalletDiagnostics
-    ORDER BY WarehouseLocationId, PalletNumber;
+    GROUP BY PalletNumber
+    ORDER BY PalletNumber;
 """
 
 _SQL_BLOCK_1_EXEC = """
     SELECT
         PalletNumber,
-        WarehouseLocationId,
-
-        ------------------------------------------------------------------
-        -- Diagnostic outcome
-        ------------------------------------------------------------------
         CASE
-            WHEN
+            WHEN MAX(
                 Fail_MinProductionDate +
                 Fail_MaxProductionDate +
                 Fail_MinWeight +
@@ -74,30 +63,29 @@ _SQL_BLOCK_1_EXEC = """
                 Fail_MinSellByDate +
                 Fail_Expired +
                 Fail_CommittedToAnotherDelivery +
-                Fail_TaskAlreadyExists = 0
+                Fail_TaskAlreadyExists
+            ) = 0
             THEN 'QUALIFIES'
             ELSE 'DOES NOT QUALIFY'
         END AS QualificationStatus,
 
-        ------------------------------------------------------------------
-        -- WHY IT FAILED (comma-separated)
-        ------------------------------------------------------------------
         LTRIM(STUFF(
             CONCAT(
-                CASE WHEN Fail_MinProductionDate = 1          THEN ', Production date too early'       ELSE '' END,
-                CASE WHEN Fail_MaxProductionDate = 1          THEN ', Production date too late'        ELSE '' END,
-                CASE WHEN Fail_MinWeight = 1                  THEN ', Weight below minimum'            ELSE '' END,
-                CASE WHEN Fail_MaxWeight = 1                  THEN ', Weight above maximum'            ELSE '' END,
-                CASE WHEN Fail_MinSellByDate = 1              THEN ', Sell-by date too early'           ELSE '' END,
-                CASE WHEN Fail_Expired = 1                    THEN ', Pallet expired'                  ELSE '' END,
-                CASE WHEN Fail_CommittedToAnotherDelivery = 1 THEN ', Already committed to delivery'   ELSE '' END,
-                CASE WHEN Fail_TaskAlreadyExists = 1          THEN ', Task already exists'              ELSE '' END
+                CASE WHEN MAX(Fail_MinProductionDate) = 1          THEN ', Production date too early'      ELSE '' END,
+                CASE WHEN MAX(Fail_MaxProductionDate) = 1          THEN ', Production date too late'       ELSE '' END,
+                CASE WHEN MAX(Fail_MinWeight) = 1                  THEN ', Weight below minimum'           ELSE '' END,
+                CASE WHEN MAX(Fail_MaxWeight) = 1                  THEN ', Weight above maximum'           ELSE '' END,
+                CASE WHEN MAX(Fail_MinSellByDate) = 1              THEN ', Sell-by date too early'         ELSE '' END,
+                CASE WHEN MAX(Fail_Expired) = 1                    THEN ', Pallet expired'                 ELSE '' END,
+                CASE WHEN MAX(Fail_CommittedToAnotherDelivery) = 1 THEN ', Already committed to delivery' ELSE '' END,
+                CASE WHEN MAX(Fail_TaskAlreadyExists) = 1          THEN ', Task already exists'            ELSE '' END
             ),
             1, 1, ''
         )) AS FailureReasons
 
     FROM ReplenPalletDiagnostics
-    ORDER BY WarehouseLocationId, PalletNumber;
+    GROUP BY PalletNumber
+    ORDER BY PalletNumber;
 """
 
 
