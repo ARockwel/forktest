@@ -15,257 +15,113 @@ DESCRIPTION = (
 
 # Build Temp Table
 SQL_BLOCK_1 = """
-    SET NOCOUNT ON;
     WITH MaxInvID AS (
-        select
-        -- Resolve the current "live" location for the highest InventoryId on this barcode.
-        -- A location is "live" only if its WarehouseArea has IsAvailable = 1.
-        (select top 1 warehouselocationid
-        from Inventorycases ic with (readuncommitted)
-        join WarehouseAreaLocations wal on wal.LocationId = ic.WarehouseLocationId
-        join WarehouseAreas wa on wa.WarehouseId = wal.WarehouseId
-                            and wa.AreaId = wal.AreaId
-                            and wa.IsAvailable = 1
-        where inventoryid = maxinvid
-        ) maxloc
-        ,cnt
-        ,maxinvid
-        ,toploc
-        ,botloc
-        ,x.PlantCode
-        ,InventoryId
-        ,ProductId
-        ,x.Barcode
-        ,BatchNumber
-        ,PalletNumber
-        ,InventoryStatusId
-        ,SapStorageLocation
-        ,EstNumber
-        ,VendorLot
-        ,EntryInventoryMovementTypeId
-        ,EntryOrderNumber
-        ,EntryOrderLineNumber
-        ,EntryDate
-        ,EntryDeliveryNumber
-        ,EntryDeliveryLineNumber
-        ,EntryShift
-        ,ExitInventoryMovementTypeId
-        ,ExitOrderNumber
-        ,ExitOrderLineNumber
-        ,ExitDate
-        ,ExitShift
-        ,Weight
-        ,ProductionDate
-        ,EntryPostedToSap
-        ,ExitPostedToSap
-        ,PostedToSapDate
-        ,x.CreatedBy
-        ,x.CreatedDate
-        ,x.ModifiedBy
-        ,x.ModifiedDate
-        ,ExitDeliveryNumber
-        ,ExitDeliveryLineNumber
-        ,WarehouseLocationId
-        ,IsNonSerializedPallet
-        ,Qty
-        ,ReceiveUOM
-        from (
-            -- Window functions run across ALL locations so cross-location duplicates are caught.
-            -- cnt:      how many InventoryCase rows exist for this barcode (any location)
-            -- maxinvid: the highest InventoryId for this barcode — treated as the "current" record
-            -- toploc / botloc: alphabetically last and first locations for this barcode (diagnostic info)
-            select count(1) over (partition by barcode) cnt
-                , max(inventoryid) over (partition by barcode) maxinvid
-                , max(WarehouseLocationId) over (partition by barcode) toploc
-                , min(WarehouseLocationId) over (partition by barcode) botloc
-                , * from InventoryCases with (readuncommitted)
-        ) x
-        -- Join to WarehouseAreas so we can filter to active areas only
-        join WarehouseAreaLocations wal with (readuncommitted) on wal.LocationId = WarehouseLocationId
-        join WarehouseAreas wa with (readuncommitted) on wa.WarehouseId = wal.WarehouseId and wa.AreaId = wal.AreaId
-        -- Only keep barcodes that have more than one InventoryCase row
-        where cnt > 1
-        -- Exclude resolved/terminal locations — fix scripts should only target active records
-        and WarehouseLocationId not in ('SHIPPED','SHIPRTN','ADJUST','LVADJ','HAM1','HAM2','BELLY','MHARV','BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2')
-    )
-
-    -- Return only the STALE duplicate rows (not the current/max record).
-        -- CurrentInventoryId is the record we keep; DuplicateInventoryId is the one to remove.
         SELECT
-            m.ProductionDate,
-            m.ProductId,
-            m.PalletNumber,
-            m.Barcode,
-            m.Weight,
-            m.cnt                  AS DuplicateCount,      -- total copies of this barcode
-            m.maxloc               AS CurrentLocation,      -- where the "keeper" record sits
-            m.maxinvid             AS CurrentInventoryId,   -- InventoryId of the keeper record
-            m.WarehouseLocationId  AS DuplicateLocation,    -- where the stale copy sits
-            m.InventoryId          AS DuplicateInventoryId, -- InventoryId of the stale copy to remove
-            m.CreatedDate,
-            m.CreatedBy,
-            m.ModifiedDate,
-            m.ModifiedBy
-        FROM MaxInvID m
-    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-        ON wal.LocationId = m.WarehouseLocationId
+            (SELECT TOP 1 warehouselocationid
+             FROM InventoryCases ic2 WITH (READUNCOMMITTED)
+             JOIN WarehouseAreaLocations wal2 ON wal2.LocationId = ic2.WarehouseLocationId
+             JOIN WarehouseAreas wa2 ON wa2.WarehouseId = wal2.WarehouseId
+                                    AND wa2.AreaId = wal2.AreaId
+                                    AND wa2.IsAvailable = 1
+             WHERE ic2.InventoryId = maxinvid
+            ) AS CurrentLocation,
+            cnt,
+            maxinvid        AS CurrentInventoryId,
+            x.InventoryId   AS DuplicateInventoryId,
+            x.Barcode,
+            x.WarehouseLocationId AS DuplicateLocation
+        FROM (
+            SELECT COUNT(1) OVER (PARTITION BY Barcode)    AS cnt,
+                   MAX(InventoryId) OVER (PARTITION BY Barcode) AS maxinvid,
+                   *
+            FROM InventoryCases WITH (READUNCOMMITTED)
+        ) x
+        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = x.WarehouseLocationId
+        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
+            ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId
+        WHERE cnt > 1
+          AND x.WarehouseLocationId NOT IN (
+                'SHIPPED','SHIPRTN','ADJUST','LVADJ',
+                'HAM1','HAM2','BELLY','MHARV',
+                'BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2'
+          )
+    )
+    SELECT
+        m.Barcode,
+        m.cnt               AS DuplicateCount,
+        m.CurrentInventoryId,
+        m.CurrentLocation,
+        m.DuplicateInventoryId,
+        m.DuplicateLocation
+    FROM MaxInvID m
+    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = m.DuplicateLocation
     JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-        ON  wa.WarehouseId = wal.WarehouseId
-        AND wa.AreaId      = wal.AreaId
-    WHERE
-        -- Exclude the keeper
-        m.maxinvid <> m.InventoryId
-        AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-
-        AND
-    	(
-    		-- Normal noise control
-    		wa.IsAvailable = 1
-
-    		OR
-    		(
-    			-- Override: BOTH InventoryIds have QA history
-    			EXISTS (
-    				SELECT 1
-    				FROM InventoryCasesQaStatuses q1
-    				WHERE q1.InventoryId = m.InventoryId
-    			)
-    			AND EXISTS (
-    				SELECT 1
-    				FROM InventoryCasesQaStatuses q2
-    				WHERE q2.InventoryId = m.maxinvid
-    			)
-    		)
-    	)
-
-        ORDER BY m.ProductionDate
+        ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId
+    WHERE m.CurrentInventoryId <> m.DuplicateInventoryId
+      AND m.DuplicateLocation NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
+      AND (
+            wa.IsAvailable = 1
+            OR (
+                EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.DuplicateInventoryId)
+                AND EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.CurrentInventoryId)
+            )
+      )
+    ORDER BY m.DuplicateLocation, m.Barcode
 """
 
 _SQL_BLOCK_1_EXEC = """
-    SET NOCOUNT ON;
     WITH MaxInvID AS (
-        select
-        -- Resolve the current "live" location for the highest InventoryId on this barcode.
-        -- A location is "live" only if its WarehouseArea has IsAvailable = 1.
-        (select top 1 warehouselocationid
-        from Inventorycases ic with (readuncommitted)
-        join WarehouseAreaLocations wal on wal.LocationId = ic.WarehouseLocationId
-        join WarehouseAreas wa on wa.WarehouseId = wal.WarehouseId
-                            and wa.AreaId = wal.AreaId
-                            and wa.IsAvailable = 1
-        where inventoryid = maxinvid
-        ) maxloc
-        ,cnt
-        ,maxinvid
-        ,toploc
-        ,botloc
-        ,x.PlantCode
-        ,InventoryId
-        ,ProductId
-        ,x.Barcode
-        ,BatchNumber
-        ,PalletNumber
-        ,InventoryStatusId
-        ,SapStorageLocation
-        ,EstNumber
-        ,VendorLot
-        ,EntryInventoryMovementTypeId
-        ,EntryOrderNumber
-        ,EntryOrderLineNumber
-        ,EntryDate
-        ,EntryDeliveryNumber
-        ,EntryDeliveryLineNumber
-        ,EntryShift
-        ,ExitInventoryMovementTypeId
-        ,ExitOrderNumber
-        ,ExitOrderLineNumber
-        ,ExitDate
-        ,ExitShift
-        ,Weight
-        ,ProductionDate
-        ,EntryPostedToSap
-        ,ExitPostedToSap
-        ,PostedToSapDate
-        ,x.CreatedBy
-        ,x.CreatedDate
-        ,x.ModifiedBy
-        ,x.ModifiedDate
-        ,ExitDeliveryNumber
-        ,ExitDeliveryLineNumber
-        ,WarehouseLocationId
-        ,IsNonSerializedPallet
-        ,Qty
-        ,ReceiveUOM
-        from (
-            -- Window functions run across ALL locations so cross-location duplicates are caught.
-            -- cnt:      how many InventoryCase rows exist for this barcode (any location)
-            -- maxinvid: the highest InventoryId for this barcode — treated as the "current" record
-            -- toploc / botloc: alphabetically last and first locations for this barcode (diagnostic info)
-            select count(1) over (partition by barcode) cnt
-                , max(inventoryid) over (partition by barcode) maxinvid
-                , max(WarehouseLocationId) over (partition by barcode) toploc
-                , min(WarehouseLocationId) over (partition by barcode) botloc
-                , * from InventoryCases with (readuncommitted)
-        ) x
-        -- Join to WarehouseAreas so we can filter to active areas only
-        join WarehouseAreaLocations wal with (readuncommitted) on wal.LocationId = WarehouseLocationId
-        join WarehouseAreas wa with (readuncommitted) on wa.WarehouseId = wal.WarehouseId and wa.AreaId = wal.AreaId
-        -- Only keep barcodes that have more than one InventoryCase row
-        where cnt > 1
-        -- Exclude resolved/terminal locations — fix scripts should only target active records
-        and WarehouseLocationId not in ('SHIPPED','SHIPRTN','ADJUST','LVADJ','HAM1','HAM2','BELLY','MHARV','BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2')
-    )
-
-    -- Return only the STALE duplicate rows (not the current/max record).
-        -- CurrentInventoryId is the record we keep; DuplicateInventoryId is the one to remove.
         SELECT
-            m.ProductionDate,
-            m.ProductId,
-            m.PalletNumber,
-            m.Barcode,
-            m.Weight,
-            m.cnt                  AS DuplicateCount,      -- total copies of this barcode
-            m.maxloc               AS CurrentLocation,      -- where the "keeper" record sits
-            m.maxinvid             AS CurrentInventoryId,   -- InventoryId of the keeper record
-            m.WarehouseLocationId  AS DuplicateLocation,    -- where the stale copy sits
-            m.InventoryId          AS DuplicateInventoryId, -- InventoryId of the stale copy to remove
-            m.CreatedDate,
-            m.CreatedBy,
-            m.ModifiedDate,
-            m.ModifiedBy
-        FROM MaxInvID m
-    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-        ON wal.LocationId = m.WarehouseLocationId
+            (SELECT TOP 1 warehouselocationid
+             FROM InventoryCases ic2 WITH (READUNCOMMITTED)
+             JOIN WarehouseAreaLocations wal2 ON wal2.LocationId = ic2.WarehouseLocationId
+             JOIN WarehouseAreas wa2 ON wa2.WarehouseId = wal2.WarehouseId
+                                    AND wa2.AreaId = wal2.AreaId
+                                    AND wa2.IsAvailable = 1
+             WHERE ic2.InventoryId = maxinvid
+            ) AS CurrentLocation,
+            cnt,
+            maxinvid        AS CurrentInventoryId,
+            x.InventoryId   AS DuplicateInventoryId,
+            x.Barcode,
+            x.WarehouseLocationId AS DuplicateLocation
+        FROM (
+            SELECT COUNT(1) OVER (PARTITION BY Barcode)    AS cnt,
+                   MAX(InventoryId) OVER (PARTITION BY Barcode) AS maxinvid,
+                   *
+            FROM InventoryCases WITH (READUNCOMMITTED)
+        ) x
+        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = x.WarehouseLocationId
+        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
+            ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId
+        WHERE cnt > 1
+          AND x.WarehouseLocationId NOT IN (
+                'SHIPPED','SHIPRTN','ADJUST','LVADJ',
+                'HAM1','HAM2','BELLY','MHARV',
+                'BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2'
+          )
+    )
+    SELECT
+        m.Barcode,
+        m.cnt               AS DuplicateCount,
+        m.CurrentInventoryId,
+        m.CurrentLocation,
+        m.DuplicateInventoryId,
+        m.DuplicateLocation
+    FROM MaxInvID m
+    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = m.DuplicateLocation
     JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-        ON  wa.WarehouseId = wal.WarehouseId
-        AND wa.AreaId      = wal.AreaId
-    WHERE
-        -- Exclude the keeper
-        m.maxinvid <> m.InventoryId
-        AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-
-        AND
-    	(
-    		-- Normal noise control
-    		wa.IsAvailable = 1
-
-    		OR
-    		(
-    			-- Override: BOTH InventoryIds have QA history
-    			EXISTS (
-    				SELECT 1
-    				FROM InventoryCasesQaStatuses q1
-    				WHERE q1.InventoryId = m.InventoryId
-    			)
-    			AND EXISTS (
-    				SELECT 1
-    				FROM InventoryCasesQaStatuses q2
-    				WHERE q2.InventoryId = m.maxinvid
-    			)
-    		)
-    	)
-
-        ORDER BY m.ProductionDate
+        ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId
+    WHERE m.CurrentInventoryId <> m.DuplicateInventoryId
+      AND m.DuplicateLocation NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
+      AND (
+            wa.IsAvailable = 1
+            OR (
+                EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.DuplicateInventoryId)
+                AND EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.CurrentInventoryId)
+            )
+      )
+    ORDER BY m.DuplicateLocation, m.Barcode
 """
 
 
@@ -290,12 +146,9 @@ def run() -> QueryResult:
         # ── Store result as named DataFrame for child queries ──────────────
         try:
             import pandas as _pd
-            _df = _pd.DataFrame([list(r) for r in rows], columns=cols)
-            result.dataframe = {"MaxInvIDResults": _df.rename(columns={
-                'DuplicateInventoryId': 'InventoryId',
-                'CurrentInventoryId':   'maxinvid',
-                'DuplicateLocation':    'WarehouseLocationId',
-            })[['InventoryId', 'maxinvid', 'WarehouseLocationId']]}
+            result.dataframe = {"MaxInvIDResults": _pd.DataFrame(
+                [list(r) for r in rows], columns=cols
+            )}
         except Exception:
             pass
 

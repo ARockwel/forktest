@@ -34,31 +34,25 @@ _SQL_BLOCK_1_EXEC = """
 
 # Get Duplicate IDs
 SQL_BLOCK_2 = """
-    SELECT m.InventoryId
-        FROM MaxInvIDResults m
-        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-            ON wal.LocationId = m.WarehouseLocationId
-        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-            ON  wa.WarehouseId = wal.WarehouseId
-            AND wa.AreaId      = wal.AreaId
-            AND wa.IsAvailable = 1
-        WHERE m.maxinvid <> m.InventoryId
-          AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-        ORDER BY m.InventoryId
+    SELECT
+        'UPDATE InventoryCases SET WarehouseLocationId = ''LVADJ'', ModifiedBy = ''DuplicateFix'', ModifiedDate = GETDATE() WHERE InventoryId = '
+        + CAST(m.DuplicateInventoryId AS VARCHAR(20)) AS FixSQL,
+        m.Barcode,
+        m.DuplicateLocation AS FromLocation,
+        m.CurrentInventoryId AS KeeperInventoryId
+    FROM MaxInvIDResults m
+    ORDER BY m.DuplicateInventoryId
 """
 
 _SQL_BLOCK_2_EXEC = """
-    SELECT m.InventoryId
-        FROM MaxInvIDResults m
-        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-            ON wal.LocationId = m.WarehouseLocationId
-        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-            ON  wa.WarehouseId = wal.WarehouseId
-            AND wa.AreaId      = wal.AreaId
-            AND wa.IsAvailable = 1
-        WHERE m.maxinvid <> m.InventoryId
-          AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-        ORDER BY m.InventoryId
+    SELECT
+        'UPDATE InventoryCases SET WarehouseLocationId = ''LVADJ'', ModifiedBy = ''DuplicateFix'', ModifiedDate = GETDATE() WHERE InventoryId = '
+        + CAST(m.DuplicateInventoryId AS VARCHAR(20)) AS FixSQL,
+        m.Barcode,
+        m.DuplicateLocation AS FromLocation,
+        m.CurrentInventoryId AS KeeperInventoryId
+    FROM MaxInvIDResults m
+    ORDER BY m.DuplicateInventoryId
 """
 
 

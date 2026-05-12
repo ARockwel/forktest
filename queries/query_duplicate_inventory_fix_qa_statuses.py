@@ -34,35 +34,31 @@ _SQL_BLOCK_1_EXEC = """
 
 # Get Duplicate IDs
 SQL_BLOCK_2 = """
-    SELECT m.InventoryId
-        FROM MaxInvIDResults m
-        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-            ON wal.LocationId = m.WarehouseLocationId
-        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-            ON  wa.WarehouseId = wal.WarehouseId
-            AND wa.AreaId      = wal.AreaId
-            AND wa.IsAvailable = 1
-        JOIN InventoryCasesQAStatuses qa WITH (READUNCOMMITTED)
-            ON qa.InventoryId = m.InventoryId
-        WHERE m.maxinvid <> m.InventoryId
-          AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-        ORDER BY m.InventoryId
+    SELECT
+        'DELETE FROM InventoryCasesQaStatuses WHERE InventoryId = '
+        + CAST(m.DuplicateInventoryId AS VARCHAR(20)) AS FixSQL,
+        m.Barcode,
+        m.DuplicateInventoryId
+    FROM MaxInvIDResults m
+    WHERE EXISTS (
+        SELECT 1 FROM InventoryCasesQaStatuses q
+        WHERE q.InventoryId = m.DuplicateInventoryId
+    )
+    ORDER BY m.DuplicateInventoryId
 """
 
 _SQL_BLOCK_2_EXEC = """
-    SELECT m.InventoryId
-        FROM MaxInvIDResults m
-        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-            ON wal.LocationId = m.WarehouseLocationId
-        JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-            ON  wa.WarehouseId = wal.WarehouseId
-            AND wa.AreaId      = wal.AreaId
-            AND wa.IsAvailable = 1
-        JOIN InventoryCasesQAStatuses qa WITH (READUNCOMMITTED)
-            ON qa.InventoryId = m.InventoryId
-        WHERE m.maxinvid <> m.InventoryId
-          AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-        ORDER BY m.InventoryId
+    SELECT
+        'DELETE FROM InventoryCasesQaStatuses WHERE InventoryId = '
+        + CAST(m.DuplicateInventoryId AS VARCHAR(20)) AS FixSQL,
+        m.Barcode,
+        m.DuplicateInventoryId
+    FROM MaxInvIDResults m
+    WHERE EXISTS (
+        SELECT 1 FROM InventoryCasesQaStatuses q
+        WHERE q.InventoryId = m.DuplicateInventoryId
+    )
+    ORDER BY m.DuplicateInventoryId
 """
 
 
