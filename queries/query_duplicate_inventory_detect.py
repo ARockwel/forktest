@@ -16,7 +16,7 @@ DESCRIPTION = (
 # Build Temp Table
 SQL_BLOCK_1 = """
     SET NOCOUNT ON;
-
+    WITH MaxInvID AS (
         select
         -- Resolve the current "live" location for the highest InventoryId on this barcode.
         -- A location is "live" only if its WarehouseArea has IsAvailable = 1.
@@ -87,11 +87,63 @@ SQL_BLOCK_1 = """
         where cnt > 1
         -- Exclude resolved/terminal locations — fix scripts should only target active records
         and WarehouseLocationId not in ('SHIPPED','SHIPRTN','ADJUST','LVADJ','HAM1','HAM2','BELLY','MHARV','BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2')
+    )
+
+    -- Return only the STALE duplicate rows (not the current/max record).
+        -- CurrentInventoryId is the record we keep; DuplicateInventoryId is the one to remove.
+        SELECT
+            m.ProductionDate,
+            m.ProductId,
+            m.PalletNumber,
+            m.Barcode,
+            m.Weight,
+            m.cnt                  AS DuplicateCount,      -- total copies of this barcode
+            m.maxloc               AS CurrentLocation,      -- where the "keeper" record sits
+            m.maxinvid             AS CurrentInventoryId,   -- InventoryId of the keeper record
+            m.WarehouseLocationId  AS DuplicateLocation,    -- where the stale copy sits
+            m.InventoryId          AS DuplicateInventoryId, -- InventoryId of the stale copy to remove
+            m.CreatedDate,
+            m.CreatedBy,
+            m.ModifiedDate,
+            m.ModifiedBy
+        FROM MaxInvID m
+    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
+        ON wal.LocationId = m.WarehouseLocationId
+    JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
+        ON  wa.WarehouseId = wal.WarehouseId
+        AND wa.AreaId      = wal.AreaId
+    WHERE
+        -- Exclude the keeper
+        m.maxinvid <> m.InventoryId
+        AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
+
+        AND
+    	(
+    		-- Normal noise control
+    		wa.IsAvailable = 1
+
+    		OR
+    		(
+    			-- Override: BOTH InventoryIds have QA history
+    			EXISTS (
+    				SELECT 1
+    				FROM InventoryCasesQaStatuses q1
+    				WHERE q1.InventoryId = m.InventoryId
+    			)
+    			AND EXISTS (
+    				SELECT 1
+    				FROM InventoryCasesQaStatuses q2
+    				WHERE q2.InventoryId = m.maxinvid
+    			)
+    		)
+    	)
+
+        ORDER BY m.ProductionDate
 """
 
 _SQL_BLOCK_1_EXEC = """
     SET NOCOUNT ON;
-
+    WITH MaxInvID AS (
         select
         -- Resolve the current "live" location for the highest InventoryId on this barcode.
         -- A location is "live" only if its WarehouseArea has IsAvailable = 1.
@@ -162,6 +214,58 @@ _SQL_BLOCK_1_EXEC = """
         where cnt > 1
         -- Exclude resolved/terminal locations — fix scripts should only target active records
         and WarehouseLocationId not in ('SHIPPED','SHIPRTN','ADJUST','LVADJ','HAM1','HAM2','BELLY','MHARV','BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2')
+    )
+
+    -- Return only the STALE duplicate rows (not the current/max record).
+        -- CurrentInventoryId is the record we keep; DuplicateInventoryId is the one to remove.
+        SELECT
+            m.ProductionDate,
+            m.ProductId,
+            m.PalletNumber,
+            m.Barcode,
+            m.Weight,
+            m.cnt                  AS DuplicateCount,      -- total copies of this barcode
+            m.maxloc               AS CurrentLocation,      -- where the "keeper" record sits
+            m.maxinvid             AS CurrentInventoryId,   -- InventoryId of the keeper record
+            m.WarehouseLocationId  AS DuplicateLocation,    -- where the stale copy sits
+            m.InventoryId          AS DuplicateInventoryId, -- InventoryId of the stale copy to remove
+            m.CreatedDate,
+            m.CreatedBy,
+            m.ModifiedDate,
+            m.ModifiedBy
+        FROM MaxInvID m
+    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
+        ON wal.LocationId = m.WarehouseLocationId
+    JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
+        ON  wa.WarehouseId = wal.WarehouseId
+        AND wa.AreaId      = wal.AreaId
+    WHERE
+        -- Exclude the keeper
+        m.maxinvid <> m.InventoryId
+        AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
+
+        AND
+    	(
+    		-- Normal noise control
+    		wa.IsAvailable = 1
+
+    		OR
+    		(
+    			-- Override: BOTH InventoryIds have QA history
+    			EXISTS (
+    				SELECT 1
+    				FROM InventoryCasesQaStatuses q1
+    				WHERE q1.InventoryId = m.InventoryId
+    			)
+    			AND EXISTS (
+    				SELECT 1
+    				FROM InventoryCasesQaStatuses q2
+    				WHERE q2.InventoryId = m.maxinvid
+    			)
+    		)
+    	)
+
+        ORDER BY m.ProductionDate
 """
 
 
@@ -185,7 +289,7 @@ def run() -> QueryResult:
         # ── Store result as named DataFrame for child queries ──────────────
         try:
             import pandas as _pd
-            result.dataframe = {"MaxInvID": _pd.DataFrame(
+            result.dataframe = {"MaxInvIDResults": _pd.DataFrame(
                 [list(r) for r in rows], columns=cols
             )}
         except Exception:

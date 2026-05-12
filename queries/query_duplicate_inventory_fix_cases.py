@@ -26,7 +26,7 @@ SQL_BLOCK_1 = """
 _SQL_BLOCK_1_EXEC = """
     SELECT TOP 1
             p.Description AS PlantName,
-            @?  AS ServerName
+            @@SERVERNAME  AS ServerName
         FROM Plants p
         JOIN InventoryCases ic WITH (READUNCOMMITTED)
             ON ic.PlantCode = p.PlantCode
@@ -62,10 +62,9 @@ _SQL_BLOCK_2_EXEC = """
 """
 
 
-def run(SERVERNAME: str = "", df: dict | None = None) -> QueryResult:
+def run(df: dict | None = None) -> QueryResult:
     result = QueryResult()
-    result.sql = SQL_BLOCK_2.strip()\
-    .replace("@SERVERNAME", f'\"{SERVERNAME}\"')
+    result.sql = SQL_BLOCK_2.strip()
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -80,12 +79,12 @@ def run(SERVERNAME: str = "", df: dict | None = None) -> QueryResult:
         import re as _re
         from common import build_values_cte as _bvc
         _cte_parts = []
-        for _df_key in ["MaxInvID", "MaxInvIDResults"]:
+        for _df_key in ["MaxInvIDResults"]:
             if df and _df_key in df:
                 _cte_parts.append(_bvc(df[_df_key], _df_key).removeprefix("WITH "))
         _cte_prefix = ("WITH " + ",\n".join(_cte_parts) + "\n") if _cte_parts else ""
         _sql_block_1 = _cte_prefix + _SQL_BLOCK_1_EXEC
-        cursor.execute(_sql_block_1, SERVERNAME)
+        cursor.execute(_sql_block_1)
         while cursor.nextset():
             pass
         _sql_block_2 = _cte_prefix + _SQL_BLOCK_2_EXEC

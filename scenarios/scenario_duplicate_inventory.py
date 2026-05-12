@@ -17,12 +17,11 @@ from common import (
 from db import Database
 
 import queries.query_duplicate_inventory_detect as q_detect
-import queries.query_duplicate_inventory_query_5 as q_query_5
 import queries.query_duplicate_inventory_fix_cases as q_fix_cases
 import queries.query_duplicate_inventory_fix_allocations as q_fix_allocations
 import queries.query_duplicate_inventory_fix_qa_statuses as q_fix_qa_statuses
 
-QUERIES = [q_detect, q_query_5, q_fix_cases, q_fix_allocations, q_fix_qa_statuses]
+QUERIES = [q_detect, q_fix_cases, q_fix_allocations, q_fix_qa_statuses]
 
 
 class ScenarioDuplicateInventory(tk.Frame):
@@ -51,14 +50,7 @@ class ScenarioDuplicateInventory(tk.Frame):
 
         inp = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         inp.pack(fill="x")
-        styled_label(inp, "SERVERNAME", color=PALETTE["text"], font=FONT_HEAD).pack(anchor="w", pady=(0, 4))
-        row_SERVERNAME = tk.Frame(inp, bg=PALETTE["surface"])
-        row_SERVERNAME.pack(fill="x", pady=(0, 8))
-        self._param_vars["SERVERNAME"] = tk.StringVar()
-        e_SERVERNAME = styled_entry(row_SERVERNAME, width=28)
-        e_SERVERNAME.config(textvariable=self._param_vars["SERVERNAME"])
-        e_SERVERNAME.pack(side="left", padx=(0, 10), ipady=5)
-        e_SERVERNAME.bind("<Return>", lambda e: self._run())
+        pass  # no user parameters required
 
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
@@ -79,9 +71,6 @@ class ScenarioDuplicateInventory(tk.Frame):
         card_detect = ResultCard(cards_frame, title=q_detect.TITLE, description=q_detect.DESCRIPTION)
         card_detect.pack(fill="x", pady=(0, 8))
         self._cards[q_detect] = card_detect
-        card_query_5 = ResultCard(cards_frame, title=q_query_5.TITLE, description=q_query_5.DESCRIPTION)
-        card_query_5.pack(fill="x", pady=(0, 8))
-        self._cards[q_query_5] = card_query_5
         card_fix_cases = ResultCard(cards_frame, title=q_fix_cases.TITLE, description=q_fix_cases.DESCRIPTION)
         card_fix_cases.pack(fill="x", pady=(0, 8))
         self._cards[q_fix_cases] = card_fix_cases
@@ -100,7 +89,6 @@ class ScenarioDuplicateInventory(tk.Frame):
         self._run_btn.config(state="disabled", text="Running...")
         self._overall_lbl.config(text="Running checks...", fg=PALETTE["text_dim"])
         self._cards[q_detect].set_running()
-        self._cards[q_query_5].set_running()
         self._cards[q_fix_cases].set_running()
         self._cards[q_fix_allocations].set_running()
         self._cards[q_fix_qa_statuses].set_running()
@@ -108,7 +96,7 @@ class ScenarioDuplicateInventory(tk.Frame):
         self._log.banner("Duplicate Inventory")
 
         import threading as _threading
-        total_queries = 5
+        total_queries = 4
         completed     = [0]
         results_store = {}
         lock          = _threading.Lock()
@@ -137,39 +125,35 @@ class ScenarioDuplicateInventory(tk.Frame):
             _finish_one(q_detect, _rs["detect"])
             if getattr(_rs["detect"], "dataframe", None):
                 _dfs.update(_rs["detect"].dataframe)
-            _rs["query_5"] = q_query_5.run(df=_dfs if _dfs else None)
-            _finish_one(q_query_5, _rs["query_5"])
-            if getattr(_rs["query_5"], "dataframe", None):
-                _dfs.update(_rs["query_5"].dataframe)
-            # ── Level 2 (3 queries in parallel) ─────────────────
-            _ev_2  = _t.Event()
-            _cnt_2 = [3]
-            _lck_2 = _t.Lock()
-            def _l2_fix_cases(_q_id="fix_cases"):
-                _rs["fix_cases"] = q_fix_cases.run(self._param_vars.get("SERVERNAME", tk.StringVar()).get().strip(), df=_dfs if _dfs else None)
+            # ── Level 1 (3 queries in parallel) ─────────────────
+            _ev_1  = _t.Event()
+            _cnt_1 = [3]
+            _lck_1 = _t.Lock()
+            def _l1_fix_cases(_q_id="fix_cases"):
+                _rs["fix_cases"] = q_fix_cases.run(df=_dfs if _dfs else None)
                 _finish_one(q_fix_cases, _rs["fix_cases"])
-                with _lck_2:
-                    _cnt_2[0] -= 1
-                    if _cnt_2[0] == 0:
-                        _ev_2.set()
-            def _l2_fix_allocations(_q_id="fix_allocations"):
-                _rs["fix_allocations"] = q_fix_allocations.run(self._param_vars.get("SERVERNAME", tk.StringVar()).get().strip(), df=_dfs if _dfs else None)
+                with _lck_1:
+                    _cnt_1[0] -= 1
+                    if _cnt_1[0] == 0:
+                        _ev_1.set()
+            def _l1_fix_allocations(_q_id="fix_allocations"):
+                _rs["fix_allocations"] = q_fix_allocations.run(df=_dfs if _dfs else None)
                 _finish_one(q_fix_allocations, _rs["fix_allocations"])
-                with _lck_2:
-                    _cnt_2[0] -= 1
-                    if _cnt_2[0] == 0:
-                        _ev_2.set()
-            def _l2_fix_qa_statuses(_q_id="fix_qa_statuses"):
-                _rs["fix_qa_statuses"] = q_fix_qa_statuses.run(self._param_vars.get("SERVERNAME", tk.StringVar()).get().strip(), df=_dfs if _dfs else None)
+                with _lck_1:
+                    _cnt_1[0] -= 1
+                    if _cnt_1[0] == 0:
+                        _ev_1.set()
+            def _l1_fix_qa_statuses(_q_id="fix_qa_statuses"):
+                _rs["fix_qa_statuses"] = q_fix_qa_statuses.run(df=_dfs if _dfs else None)
                 _finish_one(q_fix_qa_statuses, _rs["fix_qa_statuses"])
-                with _lck_2:
-                    _cnt_2[0] -= 1
-                    if _cnt_2[0] == 0:
-                        _ev_2.set()
-            _t.Thread(target=_l2_fix_cases, daemon=True).start()
-            _t.Thread(target=_l2_fix_allocations, daemon=True).start()
-            _t.Thread(target=_l2_fix_qa_statuses, daemon=True).start()
-            _ev_2.wait()
+                with _lck_1:
+                    _cnt_1[0] -= 1
+                    if _cnt_1[0] == 0:
+                        _ev_1.set()
+            _t.Thread(target=_l1_fix_cases, daemon=True).start()
+            _t.Thread(target=_l1_fix_allocations, daemon=True).start()
+            _t.Thread(target=_l1_fix_qa_statuses, daemon=True).start()
+            _ev_1.wait()
             _r_tmp = _rs.get("fix_cases")
             if _r_tmp and getattr(_r_tmp, "dataframe", None):
                 _dfs.update(_r_tmp.dataframe)
