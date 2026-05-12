@@ -73,50 +73,62 @@ If you prefer to develop in VS Code instead of using the batch launcher:
 
 ---
 
-## Git Setup — Push & Pull Changes
+## Contributing — Fork & Pull Request
 
-Before you can push and pull changes to the repository, configure Git with your credentials:
+Org members have read access to `SF-jbs/WDT`. To contribute changes, fork the repo and submit a PR.
 
-1. **Configure your Git identity (one-time setup):**
-   - Open Terminal in VS Code (`Ctrl+``)
-   - Run:
+1. **Fork the repository:**
+   - Go to [github.com/SF-jbs/WDT](https://github.com/SF-jbs/WDT)
+   - Click **Fork** (top-right) — this creates `your-username/WDT` under your own GitHub account
+
+2. **Clone your fork:**
    ```bash
-   git config --local user.name "Your Name on GIT"
+   mkdir C:\Users\<your username>\Workspace
+   cd C:\Users\<your username>\Workspace
+   git clone https://github.com/<your-username>/WDT.git
+   cd WDT
+   ```
+
+3. **Configure your Git identity (one-time setup):**
+   ```bash
+   git config --local user.name "Your Name"
    git config --local user.email "your.email@company.com"
    ```
 
-2. **Authenticate with GitHub:**
-   - Use Personal Access Token (PAT)
-     - Go to [GitHub Settings → Developer Settings → Personal Access Tokens](https://github.com/settings/tokens)
-     - Create a new token with `repo` scope
-     - VS Code will prompt you to authenticate; paste the token when asked
+4. **Authenticate with GitHub:**
+   - Use a Personal Access Token (PAT)
+   - Go to [GitHub Settings → Developer Settings → Personal Access Tokens](https://github.com/settings/tokens)
+   - Create a token with `repo` scope
+   - VS Code will prompt for credentials on first push — paste the token when asked
 
-3. **Pull latest changes before starting work:**
-   ```bash
-   git pull origin main
-   ```
-   - Skip steps 4-7 if you are not submitting any changes to the REPO
-
-4. **Create a feature branch for your changes:**
+5. **Create a feature branch:**
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
-5. **Make your changes and commit:**
+6. **Make your changes and commit:**
    - Edit files as needed
    - Open the Source Control panel in VS Code (`Ctrl+Shift+G`)
    - Stage changes and write a clear commit message
    - Click **Commit**
 
-6. **Push your branch to GitHub:**
+7. **Push your branch to your fork:**
    ```bash
    git push origin feature/your-feature-name
    ```
 
-7. **Create a Pull Request:**
+8. **Open a Pull Request:**
    - Go to [github.com/SF-jbs/WDT](https://github.com/SF-jbs/WDT)
-   - GitHub will show a prompt to create a PR from your branch
-   - Add a description of your changes and submit
+   - Click **Pull requests** → **New pull request**
+   - Click **compare across forks**, select your fork and branch as the source
+   - Add a description and submit
+
+9. **Keep your fork up to date:**
+   ```bash
+   git remote add upstream https://github.com/SF-jbs/WDT.git
+   git fetch upstream
+   git merge upstream/main
+   ```
 
 ---
 
