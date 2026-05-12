@@ -160,16 +160,24 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
                 f"        {exec_sql_var} = {exec_sql_var}.replace('@{tp}', {tp})"
             )
 
-        # Build cursor.execute call
-        if block_user_params:
-            if len(block_user_params) == 1:
+        # Build cursor.execute call.
+        # Count occurrences of each @param in this block — if a param appears N times
+        # in the SQL, _sql_to_positional emits N '?' placeholders so pyodbc needs the
+        # value passed N times.
+        exec_args = []
+        for name in block_user_params:
+            count = len(re.findall(r'@' + re.escape(name) + r'\b', block.sql, re.IGNORECASE))
+            exec_args.extend([name] * max(count, 1))
+
+        if exec_args:
+            if len(exec_args) == 1:
                 exec_lines.append(
-                    f"        cursor.execute({exec_sql_var}, {block_user_params[0]})"
+                    f"        cursor.execute({exec_sql_var}, {exec_args[0]})"
                 )
             else:
-                params_str = ', '.join(block_user_params)
+                args_str = ', '.join(exec_args)
                 exec_lines.append(
-                    f"        cursor.execute({exec_sql_var}, ({params_str},))"
+                    f"        cursor.execute({exec_sql_var}, ({args_str},))"
                 )
         else:
             exec_lines.append(f"        cursor.execute({exec_sql_var})")
@@ -183,6 +191,7 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
     exec_lines += [
         "        rows = cursor.fetchall()",
         "        cols = [col[0] for col in cursor.description]",
+        "        result.cols = cols",
     ]
 
     # Explicit DataFrame path: store this query's result set directly as a DataFrame.

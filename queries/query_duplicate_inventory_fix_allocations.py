@@ -8,68 +8,91 @@ queries/query_duplicate_inventory_fix_allocations.py
 
 from common import QueryResult
 from db import db
-
 TITLE       = "Fix Script — Delete Duplicate DeliveryAllocations"
 DESCRIPTION = (
-    "Generates a SQL DELETE script to remove DeliveryAllocations records "
-    "linked to duplicate inventory. Copy the script and run it in SSMS."
+    "Generates a SQL DELETE script to remove DeliveryAllocations records linked to duplicate inventory."
 )
 
-# Pulls the plant name and server so the generated script is self-documenting
 # Get Plant/Server
 SQL_BLOCK_1 = """
     SELECT TOP 1
-        p.Description AS PlantName,
-        @@SERVERNAME  AS ServerName
-    FROM Plants p
-    JOIN InventoryCases ic WITH (READUNCOMMITTED)
-        ON ic.PlantCode = p.PlantCode
+            p.Description AS PlantName,
+            @@SERVERNAME  AS ServerName
+        FROM Plants p
+        JOIN InventoryCases ic WITH (READUNCOMMITTED)
+            ON ic.PlantCode = p.PlantCode
 """
-_SQL_BLOCK_1_EXEC = SQL_BLOCK_1
 
-# Selects stale InventoryIds that also have a linked DeliveryAllocations row.
-# DeliveryAllocations records must be deleted before the InventoryCase can be
-# safely moved to LVADJ — otherwise a foreign key or orphan record remains.
+_SQL_BLOCK_1_EXEC = """
+    SELECT TOP 1
+            p.Description AS PlantName,
+            @@SERVERNAME  AS ServerName
+        FROM Plants p
+        JOIN InventoryCases ic WITH (READUNCOMMITTED)
+            ON ic.PlantCode = p.PlantCode
+"""
+
 # Get Duplicate IDs
 SQL_BLOCK_2 = """
-    SELECT m.InventoryId
-    FROM #MaxInvID m
-    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
-        ON wal.LocationId = m.WarehouseLocationId
-    JOIN WarehouseAreas wa WITH (READUNCOMMITTED)
-        ON  wa.WarehouseId = wal.WarehouseId
-        AND wa.AreaId      = wal.AreaId
-        AND wa.IsAvailable = 1
-    JOIN DeliveryAllocations da WITH (READUNCOMMITTED)
-        ON da.InventoryId = m.InventoryId
-    WHERE m.maxinvid <> m.InventoryId
-      AND m.WarehouseLocationId NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')
-    ORDER BY m.InventoryId
+    SELECT
+        'DELETE FROM DeliveryAllocations WHERE InventoryId = '
+        + CAST(m.DuplicateInventoryId AS VARCHAR(20)) AS FixSQL,
+        m.Barcode,
+        m.DuplicateInventoryId
+    FROM MaxInvIDResults m
+    WHERE EXISTS (
+        SELECT 1 FROM DeliveryAllocations da
+        WHERE da.InventoryId = m.DuplicateInventoryId
+    )
+    ORDER BY m.DuplicateInventoryId
 """
-_SQL_BLOCK_2_EXEC = SQL_BLOCK_2
+
+_SQL_BLOCK_2_EXEC = """
+    SELECT
+        'DELETE FROM DeliveryAllocations WHERE InventoryId = '
+        + CAST(m.DuplicateInventoryId AS VARCHAR(20)) AS FixSQL,
+        m.Barcode,
+        m.DuplicateInventoryId
+    FROM MaxInvIDResults m
+    WHERE EXISTS (
+        SELECT 1 FROM DeliveryAllocations da
+        WHERE da.InventoryId = m.DuplicateInventoryId
+    )
+    ORDER BY m.DuplicateInventoryId
+"""
 
 
 def run(df: dict | None = None) -> QueryResult:
     result = QueryResult()
-    result.add_message("info", f"[{TITLE}] Generating fix script for duplicate DeliveryAllocations...")
+    result.sql = SQL_BLOCK_2.strip()
+    result.add_message("info", f"[{TITLE}] Running...")
 
     try:
         cursor = db.conn.cursor()
 
-        cursor.execute(SQL_BLOCK_1)
-        header_row = cursor.fetchone()
-        plant  = header_row[0] if header_row else "Unknown Plant"
-        server = header_row[1] if header_row else "Unknown Server"
+        if getattr(db, "cancelled", False):
+            result.status  = "error"
+            result.headline = "Query cancelled — disconnected."
+            return result
 
-        _sql_ids = _SQL_BLOCK_2_EXEC
-        if df and "MAXINVID" in df:
-            import re as _re
-            from common import build_values_cte as _bvc
-            _cte = _bvc(df["MAXINVID"], "MAXINVID")
-            _sql_ids = _cte + "\n" + _re.sub(r'#MaxInvID\b', 'MAXINVID', _sql_ids, flags=_re.IGNORECASE)
+        # ── DataFrame → VALUES CTE injection ────────────────────────────────
+        import re as _re
+        from common import build_values_cte as _bvc
+        _cte_parts = []
+        for _df_key in ["MaxInvIDResults"]:
+            if df and _df_key in df:
+                _cte_parts.append(_bvc(df[_df_key], _df_key).removeprefix("WITH "))
+        _cte_prefix = ("WITH " + ",\n".join(_cte_parts) + "\n") if _cte_parts else ""
+        _sql_block_1 = _cte_prefix + _SQL_BLOCK_1_EXEC
+        cursor.execute(_sql_block_1)
+        while cursor.nextset():
+            pass
+        _sql_block_2 = _cte_prefix + _SQL_BLOCK_2_EXEC
+        cursor.execute(_sql_block_2)
+        rows = cursor.fetchall()
+        cols = [col[0] for col in cursor.description]
+        result.cols = cols
 
-        cursor.execute(_sql_ids)
-        ids = [str(row[0]) for row in cursor.fetchall()]
     except Exception as exc:
         result.success  = False
         result.status   = "error"
@@ -77,38 +100,14 @@ def run(df: dict | None = None) -> QueryResult:
         result.add_message("error", result.headline)
         return result
 
-    if not ids:
-        # No duplicate cases have linked allocation records — nothing to clean up
+    if not rows:
         result.status   = "ok"
-        result.headline = "No linked DeliveryAllocations found — no script needed."
+        result.headline = "No records found."
         result.add_message("success", f"  ✔ {TITLE}: {result.headline}")
-        return result
-
-    # Build the DELETE script as a list of lines stored in result.data.
-    # Run this BEFORE the InventoryCases fix script — child records must be
-    # removed before moving the parent case to LVADJ.
-    lines = [
-        f"-- {plant}",
-        f"-- {server}",
-        "",
-        "BEGIN TRAN t1",
-        "",
-        "DELETE FROM DeliveryAllocations",
-        "WHERE InventoryId IN (",
-    ]
-    for i, inv_id in enumerate(ids):
-        comma = "," if i < len(ids) - 1 else ""
-        lines.append(f"    '{inv_id}'{comma}")
-    lines += [
-        ")",
-        "",
-        "-- COMMIT TRAN t1",
-        "-- ROLLBACK TRAN t1",
-    ]
-
-    result.status   = "issues_found"
-    result.headline = f"Script generated for {len(ids)} DeliveryAllocation record(s). Copy and run in SSMS."
-    result.data     = lines
-    result.add_message("warning", f"  ⚠ {result.headline}")
+    else:
+        result.status   = "issues_found"
+        result.headline = f"{len(rows)} record(s) found."
+        result.data     = [" | ".join(str(v) for v in row) for row in rows]
+        result.add_message("warning", f"  ⚠ {result.headline}")
 
     return result

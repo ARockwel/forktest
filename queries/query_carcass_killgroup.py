@@ -52,6 +52,7 @@ def run(killgroupid: str = "") -> QueryResult:
         cursor.execute(_sql_block_1)
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
+        result.cols = cols
 
     except Exception as exc:
         result.success  = False

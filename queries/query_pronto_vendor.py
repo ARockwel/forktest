@@ -49,6 +49,7 @@ def run(third_party_id: str = "") -> QueryResult:
         cursor.execute(_SQL_BLOCK_1_EXEC, third_party_id)
         row = cursor.fetchone()
         cols = [col[0] for col in cursor.description]
+        result.cols = cols
     except Exception as exc:
         result.success  = False
         result.status   = "error"

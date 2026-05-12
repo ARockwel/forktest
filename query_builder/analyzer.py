@@ -19,7 +19,7 @@ def detect_parameters(sql: str) -> list[str]:
     """
     seen = set()
     result = []
-    for m in re.finditer(r'@(?!@)(\w+)', sql, re.IGNORECASE):
+    for m in re.finditer(r'(?<!@)@(?!@)(\w+)', sql, re.IGNORECASE):
         name = m.group(1)
         if name not in seen:
             seen.add(name)
