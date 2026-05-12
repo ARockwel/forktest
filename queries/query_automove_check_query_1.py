@@ -261,6 +261,7 @@ def run(DeliveryNumber: str = "") -> QueryResult:
         cursor.execute(_sql_block_1, (DeliveryNumber, DeliveryNumber,))
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
+        result.cols = cols
         # ── Store result as named DataFrame for child queries ──────────────
         try:
             import pandas as _pd

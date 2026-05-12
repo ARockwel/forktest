@@ -100,6 +100,7 @@ class QueryResult:
         self.headline  : str         = ""
         self.messages  : list[tuple] = []
         self.data      : list[str]   = []
+        self.cols      : list[str]   = []   # column names from cursor.description
         self.extracted : dict        = {}   # intermediate values for chained queries
         self.sql       : str         = ""   # SQL executed; surfaced via Copy Query
         self.dataframe : dict | None = None # {TBL_KEY: pd.DataFrame} from temp table parents
@@ -329,7 +330,8 @@ class ResultCard(tk.Frame):
             hdr, "Copy Query", self._copy_query, accent=False, width=10)
         self._copy_query_btn.pack(side="right", padx=(0, 4))
         self._copy_query_btn.pack_forget()
-        self._sql: str = ""
+        self._sql:  str       = ""
+        self._cols: list[str] = []
 
         # Description
         tk.Label(self, text=description, bg=PALETTE["surface2"],
@@ -414,6 +416,8 @@ class ResultCard(tk.Frame):
         if result.sql:
             self._show_query_btn(result.sql)
 
+        self._cols = result.cols
+
         if result.status == "error":
             self._status_icon.config(text="✘", fg=PALETTE["error"])
             self._status_lbl.config(text=result.headline, fg=PALETTE["error"])
@@ -458,8 +462,12 @@ class ResultCard(tk.Frame):
 
     def _copy_ids(self):
         ids = self._get_ids()
+        lines = []
+        if self._cols:
+            lines.append(" | ".join(self._cols))
+        lines.extend(ids)
         self.clipboard_clear()
-        self.clipboard_append("\n".join(ids))
+        self.clipboard_append("\n".join(lines))
         self._copy_btn.config(text="Copied!")
         self.after(1800, lambda: self._copy_btn.config(text="Copy Data"))
 

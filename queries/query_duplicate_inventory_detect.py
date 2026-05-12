@@ -286,12 +286,16 @@ def run() -> QueryResult:
         cursor.execute(_sql_block_1)
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
+        result.cols = cols
         # ── Store result as named DataFrame for child queries ──────────────
         try:
             import pandas as _pd
-            result.dataframe = {"MaxInvIDResults": _pd.DataFrame(
-                [list(r) for r in rows], columns=cols
-            )}
+            _df = _pd.DataFrame([list(r) for r in rows], columns=cols)
+            result.dataframe = {"MaxInvIDResults": _df.rename(columns={
+                'DuplicateInventoryId': 'InventoryId',
+                'CurrentInventoryId':   'maxinvid',
+                'DuplicateLocation':    'WarehouseLocationId',
+            })[['InventoryId', 'maxinvid', 'WarehouseLocationId']]}
         except Exception:
             pass
 

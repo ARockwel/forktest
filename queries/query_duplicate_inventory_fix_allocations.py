@@ -95,6 +95,7 @@ def run(df: dict | None = None) -> QueryResult:
         cursor.execute(_sql_block_2)
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
+        result.cols = cols
 
     except Exception as exc:
         result.success  = False

@@ -57,6 +57,7 @@ def run(carcass_id: str = "") -> QueryResult:
         cursor.execute(_sql_block_1, carcass_id)
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
+        result.cols = cols
 
     except Exception as exc:
         result.success  = False

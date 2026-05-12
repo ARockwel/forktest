@@ -191,6 +191,7 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
     exec_lines += [
         "        rows = cursor.fetchall()",
         "        cols = [col[0] for col in cursor.description]",
+        "        result.cols = cols",
     ]
 
     # Explicit DataFrame path: store this query's result set directly as a DataFrame.
