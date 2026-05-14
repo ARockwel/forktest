@@ -1,0 +1,99 @@
+{
+  "title": "Pick Detail Tracking",
+  "icon": "",
+  "environments": [
+    "PROD",
+    "QA"
+  ],
+  "business_units": [
+    "Beef/Pork"
+  ],
+  "queries": [
+    {
+      "id": "query_1",
+      "title": "PalletPlanningPickGroups Info",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": "select * from PalletPlanningPickGroups\nwhere pickgroupid in (\nselect PickGroupId from PalletPlanningPickDetails\nwhere (@barcode = '' or barcode = @barcode)\nand (@pickid = '' or PickId = @pickid)\n)"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "barcode",
+          "label": "barcode",
+          "default": ""
+        },
+        {
+          "name": "pickid",
+          "label": "pickid",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "query_2",
+      "title": "PalletPlanningPickDetails Info",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": "SELECT *\nFROM PalletPlanningPickDetails d\nWHERE \n    (@barcode = '' OR d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.barcode = @barcode\n    ))\nAND (\n    @pickid = '' OR d.PickGroupId IN (\n        SELECT g.PickGroupId\n        FROM PalletPlanningPickGroups g\n        WHERE g.PickId = @pickid\n    )\n)"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "barcode",
+          "label": "barcode",
+          "default": ""
+        },
+        {
+          "name": "pickid",
+          "label": "pickid",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "query_3",
+      "title": "Barcode singled out",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": "select * from PalletPlanningPickDetails\nwhere (@barcode = '' or barcode = @barcode)"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "barcode",
+          "label": "barcode",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    }
+  ],
+  "file_prefix": "pick_detail_tracking"
+}
