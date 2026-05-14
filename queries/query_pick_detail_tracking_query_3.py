@@ -15,20 +15,49 @@ DESCRIPTION = (
 
 # Block 1
 SQL_BLOCK_1 = """
-    select * from PalletPlanningPickDetails
-    where (@barcode = '' or barcode = @barcode)
+    SELECT *
+    FROM PalletPlanningPickDetails d
+    WHERE 
+        (
+            @barcode <> '' 
+            AND d.barcode = @barcode
+        )
+        OR (
+            @barcode = ''
+            AND @warehouselocationid <> ''
+            AND d.barcode IN (
+                SELECT pd.barcode
+                FROM PalletPlanningPickDetails pd
+                WHERE pd.SourceLocation = @warehouselocationid
+            )
+        )
 """
 
 _SQL_BLOCK_1_EXEC = """
-    select * from PalletPlanningPickDetails
-    where (? = '' or barcode = ?)
+    SELECT *
+    FROM PalletPlanningPickDetails d
+    WHERE 
+        (
+            ? <> '' 
+            AND d.barcode = ?
+        )
+        OR (
+            ? = ''
+            AND ? <> ''
+            AND d.barcode IN (
+                SELECT pd.barcode
+                FROM PalletPlanningPickDetails pd
+                WHERE pd.SourceLocation = ?
+            )
+        )
 """
 
 
-def run(barcode: str = "") -> QueryResult:
+def run(barcode: str = "", warehouselocationid: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@barcode", f'\"{barcode}\"')
+    .replace("@barcode", f'\"{barcode}\"')\
+    .replace("@warehouselocationid", f'\"{warehouselocationid}\"')
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -40,7 +69,7 @@ def run(barcode: str = "") -> QueryResult:
             return result
 
         _sql_block_1 = _SQL_BLOCK_1_EXEC
-        cursor.execute(_sql_block_1, (barcode, barcode,))
+        cursor.execute(_sql_block_1, (barcode, barcode, barcode, warehouselocationid, warehouselocationid,))
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
         result.cols = cols

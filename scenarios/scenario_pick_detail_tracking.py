@@ -65,6 +65,14 @@ class ScenarioPickDetailTracking(tk.Frame):
         e_pickid.config(textvariable=self._param_vars["pickid"])
         e_pickid.pack(side="left", padx=(0, 10), ipady=5)
         e_pickid.bind("<Return>", lambda e: self._run())
+        styled_label(inp, "warehouselocationid", color=PALETTE["text"], font=FONT_HEAD).pack(anchor="w", pady=(0, 4))
+        row_warehouselocationid = tk.Frame(inp, bg=PALETTE["surface"])
+        row_warehouselocationid.pack(fill="x", pady=(0, 8))
+        self._param_vars["warehouselocationid"] = tk.StringVar()
+        e_warehouselocationid = styled_entry(row_warehouselocationid, width=28)
+        e_warehouselocationid.config(textvariable=self._param_vars["warehouselocationid"])
+        e_warehouselocationid.pack(side="left", padx=(0, 10), ipady=5)
+        e_warehouselocationid.bind("<Return>", lambda e: self._run())
 
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
@@ -131,7 +139,7 @@ class ScenarioPickDetailTracking(tk.Frame):
             import threading as _t
             _rs  = {}   # query_id → QueryResult
             _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
-            _rs["query_1"] = q_query_1.run(self._param_vars.get("barcode", tk.StringVar()).get().strip(), self._param_vars.get("pickid", tk.StringVar()).get().strip())
+            _rs["query_1"] = q_query_1.run(self._param_vars.get("barcode", tk.StringVar()).get().strip(), self._param_vars.get("pickid", tk.StringVar()).get().strip(), self._param_vars.get("warehouselocationid", tk.StringVar()).get().strip())
             _finish_one(q_query_1, _rs["query_1"])
             if getattr(_rs["query_1"], "dataframe", None):
                 _dfs.update(_rs["query_1"].dataframe)
@@ -140,7 +148,7 @@ class ScenarioPickDetailTracking(tk.Frame):
             import threading as _t
             _rs  = {}   # query_id → QueryResult
             _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
-            _rs["query_2"] = q_query_2.run(self._param_vars.get("barcode", tk.StringVar()).get().strip(), self._param_vars.get("pickid", tk.StringVar()).get().strip())
+            _rs["query_2"] = q_query_2.run(self._param_vars.get("barcode", tk.StringVar()).get().strip(), self._param_vars.get("warehouselocationid", tk.StringVar()).get().strip(), self._param_vars.get("pickid", tk.StringVar()).get().strip())
             _finish_one(q_query_2, _rs["query_2"])
             if getattr(_rs["query_2"], "dataframe", None):
                 _dfs.update(_rs["query_2"].dataframe)
@@ -149,7 +157,7 @@ class ScenarioPickDetailTracking(tk.Frame):
             import threading as _t
             _rs  = {}   # query_id → QueryResult
             _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
-            _rs["query_3"] = q_query_3.run(self._param_vars.get("barcode", tk.StringVar()).get().strip())
+            _rs["query_3"] = q_query_3.run(self._param_vars.get("barcode", tk.StringVar()).get().strip(), self._param_vars.get("warehouselocationid", tk.StringVar()).get().strip())
             _finish_one(q_query_3, _rs["query_3"])
             if getattr(_rs["query_3"], "dataframe", None):
                 _dfs.update(_rs["query_3"].dataframe)

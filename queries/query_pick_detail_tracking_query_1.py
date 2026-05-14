@@ -15,29 +15,58 @@ DESCRIPTION = (
 
 # Block 1
 SQL_BLOCK_1 = """
-    select * from PalletPlanningPickGroups
-    where pickgroupid in (
-    select PickGroupId from PalletPlanningPickDetails
-    where (@barcode = '' or barcode = @barcode)
-    and (@pickid = '' or PickId = @pickid)
+    SELECT *
+    FROM PalletPlanningPickGroups
+    WHERE pickgroupid IN (
+        SELECT PickGroupId
+        FROM PalletPlanningPickDetails
+        WHERE 
+            (
+                -- normal filters
+                (@barcode <> '' AND barcode = @barcode)
+                OR (@pickid <> '' AND PickId = @pickid)
+            
+                -- fallback to location ONLY if both are empty
+                OR (
+                    @barcode = '' 
+                    AND @pickid = '' 
+                    AND @warehouselocationid <> ''
+                    AND SourceLocation = @warehouselocationid
+                )
+            )
     )
 """
 
 _SQL_BLOCK_1_EXEC = """
-    select * from PalletPlanningPickGroups
-    where pickgroupid in (
-    select PickGroupId from PalletPlanningPickDetails
-    where (? = '' or barcode = ?)
-    and (? = '' or PickId = ?)
+    SELECT *
+    FROM PalletPlanningPickGroups
+    WHERE pickgroupid IN (
+        SELECT PickGroupId
+        FROM PalletPlanningPickDetails
+        WHERE 
+            (
+                -- normal filters
+                (? <> '' AND barcode = ?)
+                OR (? <> '' AND PickId = ?)
+            
+                -- fallback to location ONLY if both are empty
+                OR (
+                    ? = '' 
+                    AND ? = '' 
+                    AND ? <> ''
+                    AND SourceLocation = ?
+                )
+            )
     )
 """
 
 
-def run(barcode: str = "", pickid: str = "") -> QueryResult:
+def run(barcode: str = "", pickid: str = "", warehouselocationid: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
     .replace("@barcode", f'\"{barcode}\"')\
-    .replace("@pickid", f'\"{pickid}\"')
+    .replace("@pickid", f'\"{pickid}\"')\
+    .replace("@warehouselocationid", f'\"{warehouselocationid}\"')
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -49,7 +78,7 @@ def run(barcode: str = "", pickid: str = "") -> QueryResult:
             return result
 
         _sql_block_1 = _SQL_BLOCK_1_EXEC
-        cursor.execute(_sql_block_1, (barcode, barcode, pickid, pickid,))
+        cursor.execute(_sql_block_1, (barcode, barcode, barcode, pickid, pickid, pickid, warehouselocationid, warehouselocationid,))
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
         result.cols = cols

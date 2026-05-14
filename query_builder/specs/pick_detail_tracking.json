@@ -16,7 +16,7 @@
       "sql_blocks": [
         {
           "label": "Block 1",
-          "sql": "select * from PalletPlanningPickGroups\nwhere pickgroupid in (\nselect PickGroupId from PalletPlanningPickDetails\nwhere (@barcode = '' or barcode = @barcode)\nand (@pickid = '' or PickId = @pickid)\n)"
+          "sql": "SELECT *\nFROM PalletPlanningPickGroups\nWHERE pickgroupid IN (\n    SELECT PickGroupId\n    FROM PalletPlanningPickDetails\n    WHERE \n        (\n            -- normal filters\n            (@barcode <> '' AND barcode = @barcode)\n            OR (@pickid <> '' AND PickId = @pickid)\n            \n            -- fallback to location ONLY if both are empty\n            OR (\n                @barcode = '' \n                AND @pickid = '' \n                AND @warehouselocationid <> ''\n                AND SourceLocation = @warehouselocationid\n            )\n        )\n)"
         }
       ],
       "parameters": [
@@ -28,6 +28,11 @@
         {
           "name": "pickid",
           "label": "pickid",
+          "default": ""
+        },
+        {
+          "name": "warehouselocationid",
+          "label": "warehouselocationid",
           "default": ""
         }
       ],
@@ -46,13 +51,18 @@
       "sql_blocks": [
         {
           "label": "Block 1",
-          "sql": "SELECT *\nFROM PalletPlanningPickDetails d\nWHERE \n    (@barcode = '' OR d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.barcode = @barcode\n    ))\nAND (\n    @pickid = '' OR d.PickGroupId IN (\n        SELECT g.PickGroupId\n        FROM PalletPlanningPickGroups g\n        WHERE g.PickId = @pickid\n    )\n)"
+          "sql": "SELECT *\nFROM PalletPlanningPickDetails d\nWHERE \n(\n    -- Case 1: barcode provided \u2192 use barcode to determine group\n    (@barcode <> '' AND d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.barcode = @barcode\n    ))\n\n    OR\n\n    -- Case 2: barcode empty \u2192 use location instead\n    (@barcode = '' AND @warehouselocationid <> '' AND d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.SourceLocation = @warehouselocationid\n    ))\n)\nAND (\n    -- pickid still optional and independent\n    @pickid = '' OR d.PickGroupId IN (\n        SELECT g.PickGroupId\n        FROM PalletPlanningPickGroups g\n        WHERE g.PickId = @pickid\n    )\n)"
         }
       ],
       "parameters": [
         {
           "name": "barcode",
           "label": "barcode",
+          "default": ""
+        },
+        {
+          "name": "warehouselocationid",
+          "label": "warehouselocationid",
           "default": ""
         },
         {
@@ -76,13 +86,18 @@
       "sql_blocks": [
         {
           "label": "Block 1",
-          "sql": "select * from PalletPlanningPickDetails\nwhere (@barcode = '' or barcode = @barcode)"
+          "sql": "SELECT *\nFROM PalletPlanningPickDetails d\nWHERE \n    (\n        @barcode <> '' \n        AND d.barcode = @barcode\n    )\n    OR (\n        @barcode = ''\n        AND @warehouselocationid <> ''\n        AND d.barcode IN (\n            SELECT pd.barcode\n            FROM PalletPlanningPickDetails pd\n            WHERE pd.SourceLocation = @warehouselocationid\n        )\n    )"
         }
       ],
       "parameters": [
         {
           "name": "barcode",
           "label": "barcode",
+          "default": ""
+        },
+        {
+          "name": "warehouselocationid",
+          "label": "warehouselocationid",
           "default": ""
         }
       ],
