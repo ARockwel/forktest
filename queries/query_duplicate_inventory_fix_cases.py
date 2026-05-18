@@ -18,7 +18,7 @@ SQL_BLOCK_1 = """
     SELECT TOP 1
             p.Description AS PlantName,
             @@SERVERNAME  AS ServerName
-        FROM Plants p
+        FROM Plants p WITH (READUNCOMMITTED)
         JOIN InventoryCases ic WITH (READUNCOMMITTED)
             ON ic.PlantCode = p.PlantCode
 """
@@ -27,7 +27,7 @@ _SQL_BLOCK_1_EXEC = """
     SELECT TOP 1
             p.Description AS PlantName,
             @@SERVERNAME  AS ServerName
-        FROM Plants p
+        FROM Plants p WITH (READUNCOMMITTED)
         JOIN InventoryCases ic WITH (READUNCOMMITTED)
             ON ic.PlantCode = p.PlantCode
 """
@@ -93,6 +93,9 @@ def run(df: dict | None = None) -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

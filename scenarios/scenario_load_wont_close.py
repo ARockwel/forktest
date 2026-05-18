@@ -16,15 +16,15 @@ from common import (
 )
 from db import Database
 
-import queries.query_missing_shipment as q_missing_shipment
-import queries.query_missing_trailer as q_missing_trailer
-import queries.query_missing_trailer_capacity as q_missing_trailer_capacity
-import queries.query_missing_delivery_allocations as q_missing_alloc
+import queries.query_load_wont_close_missing_shipment as q_missing_shipment
+import queries.query_load_wont_close_missing_trailer as q_missing_trailer
+import queries.query_load_wont_close_missing_trailer_capacity as q_missing_trailer_capacity
+import queries.query_load_wont_close_missing_delivery_allocations as q_missing_delivery_allocations
 
-QUERIES = [q_missing_shipment, q_missing_trailer, q_missing_trailer_capacity, q_missing_alloc]
+QUERIES = [q_missing_shipment, q_missing_trailer, q_missing_trailer_capacity, q_missing_delivery_allocations]
 
 
-class ScenarioLoadWontClose(tk.Frame):
+class ScenarioLoadWonTClose(tk.Frame):
 
     TITLE          = "Load Won't Close"
     ICON           = "⚠"
@@ -58,6 +58,7 @@ class ScenarioLoadWontClose(tk.Frame):
         e_delivery_number.config(textvariable=self._param_vars["delivery_number"])
         e_delivery_number.pack(side="left", padx=(0, 10), ipady=5)
         e_delivery_number.bind("<Return>", lambda e: self._run())
+
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
         self._run_btn = styled_button(btn_row, "▶  Run All Checks", self._run, width=18)
@@ -74,24 +75,20 @@ class ScenarioLoadWontClose(tk.Frame):
 
         cards_frame = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         cards_frame.pack(fill="both", expand=True)
-        card_q_missing_shipment = ResultCard(cards_frame, title=q_missing_shipment.TITLE, description=q_missing_shipment.DESCRIPTION)
-        card_q_missing_shipment.pack(fill="x", pady=(0, 8))
-        self._cards[q_missing_shipment] = card_q_missing_shipment
-        card_q_missing_trailer = ResultCard(cards_frame, title=q_missing_trailer.TITLE, description=q_missing_trailer.DESCRIPTION)
-        card_q_missing_trailer.pack(fill="x", pady=(0, 8))
-        self._cards[q_missing_trailer] = card_q_missing_trailer
-        card_q_missing_trailer_capacity = ResultCard(cards_frame, title=q_missing_trailer_capacity.TITLE, description=q_missing_trailer_capacity.DESCRIPTION)
-        card_q_missing_trailer_capacity.pack(fill="x", pady=(0, 8))
-        self._cards[q_missing_trailer_capacity] = card_q_missing_trailer_capacity
-        card_q_missing_alloc = ResultCard(cards_frame, title=q_missing_alloc.TITLE, description=q_missing_alloc.DESCRIPTION)
-        card_q_missing_alloc.pack(fill="x", pady=(0, 8))
-        self._cards[q_missing_alloc] = card_q_missing_alloc
+        card_missing_shipment = ResultCard(cards_frame, title=q_missing_shipment.TITLE, description=q_missing_shipment.DESCRIPTION)
+        card_missing_shipment.pack(fill="x", pady=(0, 8))
+        self._cards[q_missing_shipment] = card_missing_shipment
+        card_missing_trailer = ResultCard(cards_frame, title=q_missing_trailer.TITLE, description=q_missing_trailer.DESCRIPTION)
+        card_missing_trailer.pack(fill="x", pady=(0, 8))
+        self._cards[q_missing_trailer] = card_missing_trailer
+        card_missing_trailer_capacity = ResultCard(cards_frame, title=q_missing_trailer_capacity.TITLE, description=q_missing_trailer_capacity.DESCRIPTION)
+        card_missing_trailer_capacity.pack(fill="x", pady=(0, 8))
+        self._cards[q_missing_trailer_capacity] = card_missing_trailer_capacity
+        card_missing_delivery_allocations = ResultCard(cards_frame, title=q_missing_delivery_allocations.TITLE, description=q_missing_delivery_allocations.DESCRIPTION)
+        card_missing_delivery_allocations.pack(fill="x", pady=(0, 8))
+        self._cards[q_missing_delivery_allocations] = card_missing_delivery_allocations
 
     def _run(self):
-        delivery_number = self._param_vars.get("delivery_number", tk.StringVar()).get().strip()
-        if not delivery_number:
-            messagebox.showwarning("Input Required", "Please enter a delivery number.")
-            return
         if not self._db.connected:
             messagebox.showerror("Not Connected", "Please connect to a plant first.")
             return
@@ -101,7 +98,7 @@ class ScenarioLoadWontClose(tk.Frame):
         self._cards[q_missing_shipment].set_running()
         self._cards[q_missing_trailer].set_running()
         self._cards[q_missing_trailer_capacity].set_running()
-        self._cards[q_missing_alloc].set_running()
+        self._cards[q_missing_delivery_allocations].set_running()
 
         self._log.banner("Load Won't Close")
 
@@ -123,33 +120,52 @@ class ScenarioLoadWontClose(tk.Frame):
         def _make_skipped(reason="Skipped"):
             from common import QueryResult
             r = QueryResult()
-            r.status   = "_skipped"
+            r.status  = "_skipped"
             r.headline = reason
             return r
 
         def _thread_0():
             import threading as _t
-            _rs  = {}
-            _dfs = {}
-            _rs["q_missing_shipment"] = q_missing_shipment.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
-            _finish_one(q_missing_shipment, _rs["q_missing_shipment"])
-            if getattr(_rs["q_missing_shipment"], "dataframe", None):
-                _dfs.update(_rs["q_missing_shipment"].dataframe)
-            _rs["q_missing_trailer"] = q_missing_trailer.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
-            _finish_one(q_missing_trailer, _rs["q_missing_trailer"])
-            if getattr(_rs["q_missing_trailer"], "dataframe", None):
-                _dfs.update(_rs["q_missing_trailer"].dataframe)
-            _rs["q_missing_trailer_capacity"] = q_missing_trailer_capacity.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
-            _finish_one(q_missing_trailer_capacity, _rs["q_missing_trailer_capacity"])
-            if getattr(_rs["q_missing_trailer_capacity"], "dataframe", None):
-                _dfs.update(_rs["q_missing_trailer_capacity"].dataframe)
-            _rs["q_missing_alloc"] = q_missing_alloc.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
-            _finish_one(q_missing_alloc, _rs["q_missing_alloc"])
-            if getattr(_rs["q_missing_alloc"], "dataframe", None):
-                _dfs.update(_rs["q_missing_alloc"].dataframe)
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["missing_shipment"] = q_missing_shipment.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
+            _finish_one(q_missing_shipment, _rs["missing_shipment"])
+            if getattr(_rs["missing_shipment"], "dataframe", None):
+                _dfs.update(_rs["missing_shipment"].dataframe)
+
+        def _thread_1():
+            import threading as _t
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["missing_trailer"] = q_missing_trailer.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
+            _finish_one(q_missing_trailer, _rs["missing_trailer"])
+            if getattr(_rs["missing_trailer"], "dataframe", None):
+                _dfs.update(_rs["missing_trailer"].dataframe)
+
+        def _thread_2():
+            import threading as _t
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["missing_trailer_capacity"] = q_missing_trailer_capacity.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
+            _finish_one(q_missing_trailer_capacity, _rs["missing_trailer_capacity"])
+            if getattr(_rs["missing_trailer_capacity"], "dataframe", None):
+                _dfs.update(_rs["missing_trailer_capacity"].dataframe)
+
+        def _thread_3():
+            import threading as _t
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["missing_delivery_allocations"] = q_missing_delivery_allocations.run(self._param_vars.get("delivery_number", tk.StringVar()).get().strip())
+            _finish_one(q_missing_delivery_allocations, _rs["missing_delivery_allocations"])
+            if getattr(_rs["missing_delivery_allocations"], "dataframe", None):
+                _dfs.update(_rs["missing_delivery_allocations"].dataframe)
+
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()
+        _t.Thread(target=_thread_1, daemon=True).start()
+        _t.Thread(target=_thread_2, daemon=True).start()
+        _t.Thread(target=_thread_3, daemon=True).start()
 
     def _apply_result(self, qry, result):
         card = self._cards.get(qry)

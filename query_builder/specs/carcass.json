@@ -16,7 +16,7 @@
       "sql_blocks": [
         {
           "label": "BackTag Lookup",
-          "sql": "SELECT TOP 1\n        KillDate,\n        KillGroupId,\n        PurchaseGroup,\n        CpsTransferStatus,\n        Eid\n    FROM BackTagCarcasses\n    WHERE CarcassId = @carcass_id\n    ORDER BY KillDate DESC"
+          "sql": "SELECT TOP 1\n        KillDate,\n        KillGroupId,\n        PurchaseGroup,\n        CpsTransferStatus,\n        Eid\n    FROM BackTagCarcasses WITH (READUNCOMMITTED)\n    WHERE CarcassId = @carcass_id\n    ORDER BY KillDate DESC"
         }
       ],
       "parameters": [
@@ -43,7 +43,7 @@
       "sql_blocks": [
         {
           "label": "Hot Carcass Lookup",
-          "sql": "SELECT TOP 1\n        Side,\n        KillDate,\n        BackTagKillDate,\n        ApprovedBy,\n        ApprovedDate\n    FROM HotCarcasses\n    WHERE BackTagCarcassId = @carcass_id\n    ORDER BY KillDate DESC"
+          "sql": "SELECT TOP 1\n        Side,\n        KillDate,\n        BackTagKillDate,\n        ApprovedBy,\n        ApprovedDate\n    FROM HotCarcasses WITH (READUNCOMMITTED)\n    WHERE BackTagCarcassId = @carcass_id\n    ORDER BY KillDate DESC"
         }
       ],
       "parameters": [
@@ -68,7 +68,7 @@
       "sql_blocks": [
         {
           "label": "EPV Lookup",
-          "sql": "SELECT TOP 1\n        Grade,\n        QualityProgram,\n        ApprovedBy,\n        ApprovedDate,\n        CpsTransfer\n    FROM EpVCarcasses\n    WHERE CarcassId = @carcass_id"
+          "sql": "SELECT TOP 1\n        Grade,\n        QualityProgram,\n        ApprovedBy,\n        ApprovedDate,\n        CpsTransfer\n    FROM EpVCarcasses WITH (READUNCOMMITTED)\n    WHERE CarcassId = @carcass_id"
         }
       ],
       "parameters": [
@@ -93,7 +93,7 @@
       "sql_blocks": [
         {
           "label": "Raw Interface Search",
-          "sql": "SELECT\n        MessageId,\n        StatusId,\n        Data\n    FROM RawInterfaceData\n    WHERE Data LIKE '%' + @carcass_id + '%'\n    AND serviceid = 'EPVService'\n    ORDER BY MessageId"
+          "sql": "SELECT\n        MessageId,\n        StatusId,\n        Data\n    FROM RawInterfaceData WITH (READUNCOMMITTED)\n    WHERE Data LIKE '%' + @carcass_id + '%'\n    AND serviceid = 'EPVService'\n    ORDER BY MessageId"
         }
       ],
       "parameters": [
@@ -118,10 +118,16 @@
       "sql_blocks": [
         {
           "label": "Kill Group Lookup",
-          "sql": "SELECT\n        ScheduleGroup,\n        PurchaseGroup,\n        HeadCount\n    FROM KillGroups\n    WHERE KillGroupId = @killgroupid"
+          "sql": "SELECT\n        ScheduleGroup,\n        PurchaseGroup,\n        HeadCount\n    FROM KillGroups WITH (READUNCOMMITTED)\n    WHERE KillGroupId = @killgroupid"
         }
       ],
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "killgroupid",
+          "label": "killgroupid",
+          "default": ""
+        }
+      ],
       "gives": [
         "ScheduleGroup"
       ],
@@ -146,10 +152,16 @@
       "sql_blocks": [
         {
           "label": "Lot Details Lookup",
-          "sql": "SELECT\n        ScheduledHeadCount,\n        ReceivedHeadCount\n    FROM LotDetails\n    WHERE ScheduleGroup = @schedulegroup"
+          "sql": "SELECT\n        ScheduledHeadCount,\n        ReceivedHeadCount\n    FROM LotDetails WITH (READUNCOMMITTED)\n    WHERE ScheduleGroup = @schedulegroup"
         }
       ],
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "schedulegroup",
+          "label": "schedulegroup",
+          "default": ""
+        }
+      ],
       "gives": [],
       "takes": [
         {

@@ -19,8 +19,8 @@ SQL_BLOCK_1 = """
         SELECT
             (SELECT TOP 1 warehouselocationid
              FROM InventoryCases ic2 WITH (READUNCOMMITTED)
-             JOIN WarehouseAreaLocations wal2 ON wal2.LocationId = ic2.WarehouseLocationId
-             JOIN WarehouseAreas wa2 ON wa2.WarehouseId = wal2.WarehouseId
+             JOIN WarehouseAreaLocations wal2 WITH (READUNCOMMITTED) ON wal2.LocationId = ic2.WarehouseLocationId
+             JOIN WarehouseAreas wa2 WITH (READUNCOMMITTED) ON wa2.WarehouseId = wal2.WarehouseId
                                     AND wa2.AreaId = wal2.AreaId
                                     AND wa2.IsAvailable = 1
              WHERE ic2.InventoryId = maxinvid
@@ -74,8 +74,8 @@ _SQL_BLOCK_1_EXEC = """
         SELECT
             (SELECT TOP 1 warehouselocationid
              FROM InventoryCases ic2 WITH (READUNCOMMITTED)
-             JOIN WarehouseAreaLocations wal2 ON wal2.LocationId = ic2.WarehouseLocationId
-             JOIN WarehouseAreas wa2 ON wa2.WarehouseId = wal2.WarehouseId
+             JOIN WarehouseAreaLocations wal2 WITH (READUNCOMMITTED) ON wal2.LocationId = ic2.WarehouseLocationId
+             JOIN WarehouseAreas wa2 WITH (READUNCOMMITTED) ON wa2.WarehouseId = wal2.WarehouseId
                                     AND wa2.AreaId = wal2.AreaId
                                     AND wa2.IsAvailable = 1
              WHERE ic2.InventoryId = maxinvid
@@ -158,6 +158,9 @@ def run() -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

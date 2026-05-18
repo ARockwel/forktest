@@ -16,7 +16,7 @@
       "sql_blocks": [
         {
           "label": "Build Temp Table",
-          "sql": "WITH MaxInvID AS (\n    SELECT\n        (SELECT TOP 1 warehouselocationid\n         FROM InventoryCases ic2 WITH (READUNCOMMITTED)\n         JOIN WarehouseAreaLocations wal2 ON wal2.LocationId = ic2.WarehouseLocationId\n         JOIN WarehouseAreas wa2 ON wa2.WarehouseId = wal2.WarehouseId\n                                AND wa2.AreaId = wal2.AreaId\n                                AND wa2.IsAvailable = 1\n         WHERE ic2.InventoryId = maxinvid\n        ) AS CurrentLocation,\n        cnt,\n        maxinvid        AS CurrentInventoryId,\n        x.InventoryId   AS DuplicateInventoryId,\n        x.Barcode,\n        x.WarehouseLocationId AS DuplicateLocation\n    FROM (\n        SELECT COUNT(1) OVER (PARTITION BY Barcode)    AS cnt,\n               MAX(InventoryId) OVER (PARTITION BY Barcode) AS maxinvid,\n               *\n        FROM InventoryCases WITH (READUNCOMMITTED)\n    ) x\n    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = x.WarehouseLocationId\n    JOIN WarehouseAreas wa WITH (READUNCOMMITTED)\n        ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId\n    WHERE cnt > 1\n      AND x.WarehouseLocationId NOT IN (\n            'SHIPPED','SHIPRTN','ADJUST','LVADJ',\n            'HAM1','HAM2','BELLY','MHARV',\n            'BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2'\n      )\n)\nSELECT\n    m.Barcode,\n    m.cnt               AS DuplicateCount,\n    m.CurrentInventoryId,\n    m.CurrentLocation,\n    m.DuplicateInventoryId,\n    m.DuplicateLocation\nFROM MaxInvID m\nJOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = m.DuplicateLocation\nJOIN WarehouseAreas wa WITH (READUNCOMMITTED)\n    ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId\nWHERE m.CurrentInventoryId <> m.DuplicateInventoryId\n  AND m.DuplicateLocation NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')\n  AND (\n        wa.IsAvailable = 1\n        OR (\n            EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.DuplicateInventoryId)\n            AND EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.CurrentInventoryId)\n        )\n  )\nORDER BY m.DuplicateLocation, m.Barcode"
+          "sql": "WITH MaxInvID AS (\n    SELECT\n        (SELECT TOP 1 warehouselocationid\n         FROM InventoryCases ic2 WITH (READUNCOMMITTED)\n         JOIN WarehouseAreaLocations wal2 WITH (READUNCOMMITTED) ON wal2.LocationId = ic2.WarehouseLocationId\n         JOIN WarehouseAreas wa2 WITH (READUNCOMMITTED) ON wa2.WarehouseId = wal2.WarehouseId\n                                AND wa2.AreaId = wal2.AreaId\n                                AND wa2.IsAvailable = 1\n         WHERE ic2.InventoryId = maxinvid\n        ) AS CurrentLocation,\n        cnt,\n        maxinvid        AS CurrentInventoryId,\n        x.InventoryId   AS DuplicateInventoryId,\n        x.Barcode,\n        x.WarehouseLocationId AS DuplicateLocation\n    FROM (\n        SELECT COUNT(1) OVER (PARTITION BY Barcode)    AS cnt,\n               MAX(InventoryId) OVER (PARTITION BY Barcode) AS maxinvid,\n               *\n        FROM InventoryCases WITH (READUNCOMMITTED)\n    ) x\n    JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = x.WarehouseLocationId\n    JOIN WarehouseAreas wa WITH (READUNCOMMITTED)\n        ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId\n    WHERE cnt > 1\n      AND x.WarehouseLocationId NOT IN (\n            'SHIPPED','SHIPRTN','ADJUST','LVADJ',\n            'HAM1','HAM2','BELLY','MHARV',\n            'BLEND1','BLEND2','BLEND3','BLEND4','BLEND5','BLEND6','TB2'\n      )\n)\nSELECT\n    m.Barcode,\n    m.cnt               AS DuplicateCount,\n    m.CurrentInventoryId,\n    m.CurrentLocation,\n    m.DuplicateInventoryId,\n    m.DuplicateLocation\nFROM MaxInvID m\nJOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED) ON wal.LocationId = m.DuplicateLocation\nJOIN WarehouseAreas wa WITH (READUNCOMMITTED)\n    ON wa.WarehouseId = wal.WarehouseId AND wa.AreaId = wal.AreaId\nWHERE m.CurrentInventoryId <> m.DuplicateInventoryId\n  AND m.DuplicateLocation NOT IN ('SHIPPED','SHIPRTN','ADJUST','LVADJ')\n  AND (\n        wa.IsAvailable = 1\n        OR (\n            EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.DuplicateInventoryId)\n            AND EXISTS (SELECT 1 FROM InventoryCasesQaStatuses WHERE InventoryId = m.CurrentInventoryId)\n        )\n  )\nORDER BY m.DuplicateLocation, m.Barcode"
         }
       ],
       "parameters": [],
@@ -35,7 +35,7 @@
       "sql_blocks": [
         {
           "label": "Get Plant/Server",
-          "sql": "SELECT TOP 1\n        p.Description AS PlantName,\n        @@SERVERNAME  AS ServerName\n    FROM Plants p\n    JOIN InventoryCases ic WITH (READUNCOMMITTED)\n        ON ic.PlantCode = p.PlantCode"
+          "sql": "SELECT TOP 1\n        p.Description AS PlantName,\n        @@SERVERNAME  AS ServerName\n    FROM Plants p WITH (READUNCOMMITTED)\n    JOIN InventoryCases ic WITH (READUNCOMMITTED)\n        ON ic.PlantCode = p.PlantCode"
         },
         {
           "label": "Get Duplicate IDs",
@@ -60,7 +60,7 @@
       "sql_blocks": [
         {
           "label": "Get Plant/Server",
-          "sql": "SELECT TOP 1\n        p.Description AS PlantName,\n        @@SERVERNAME  AS ServerName\n    FROM Plants p\n    JOIN InventoryCases ic WITH (READUNCOMMITTED)\n        ON ic.PlantCode = p.PlantCode"
+          "sql": "SELECT TOP 1\n        p.Description AS PlantName,\n        @@SERVERNAME  AS ServerName\n    FROM Plants p WITH (READUNCOMMITTED)\n    JOIN InventoryCases ic WITH (READUNCOMMITTED)\n        ON ic.PlantCode = p.PlantCode"
         },
         {
           "label": "Get Duplicate IDs",
@@ -85,7 +85,7 @@
       "sql_blocks": [
         {
           "label": "Get Plant/Server",
-          "sql": "SELECT TOP 1\n        p.Description AS PlantName,\n        @@SERVERNAME  AS ServerName\n    FROM Plants p\n    JOIN InventoryCases ic WITH (READUNCOMMITTED)\n        ON ic.PlantCode = p.PlantCode"
+          "sql": "SELECT TOP 1\n        p.Description AS PlantName,\n        @@SERVERNAME  AS ServerName\n    FROM Plants p WITH (READUNCOMMITTED)\n    JOIN InventoryCases ic WITH (READUNCOMMITTED)\n        ON ic.PlantCode = p.PlantCode"
         },
         {
           "label": "Get Duplicate IDs",

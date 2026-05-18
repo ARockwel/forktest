@@ -7,7 +7,6 @@
   "business_units": [
     "Beef/Pork"
   ],
-  "file_prefix": "iws_delay",
   "queries": [
     {
       "id": "iws_pending",
@@ -16,7 +15,7 @@
       "sql_blocks": [
         {
           "label": "Check Pending Messages",
-          "sql": "SELECT MessageName, COUNT(*) AS PendingCount\n    FROM OutboundHostMessages\n    WHERE status NOT IN ('COMPLETED', 'ERROR')\n      AND CAST(createtime AS DATE) = CAST(GETDATE() AS DATE)\n    GROUP BY MessageName\n    ORDER BY PendingCount DESC"
+          "sql": "SELECT MessageName, COUNT(*) AS PendingCount\n    FROM OutboundHostMessages WITH (READUNCOMMITTED)\n    WHERE status NOT IN ('COMPLETED', 'ERROR')\n      AND CAST(createtime AS DATE) = CAST(GETDATE() AS DATE)\n    GROUP BY MessageName\n    ORDER BY PendingCount DESC"
         }
       ],
       "parameters": [],
@@ -28,5 +27,6 @@
       "creates_temp_tables": [],
       "reads_temp_tables": []
     }
-  ]
+  ],
+  "file_prefix": "iws_delay"
 }

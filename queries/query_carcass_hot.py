@@ -21,7 +21,7 @@ SQL_BLOCK_1 = """
             BackTagKillDate,
             ApprovedBy,
             ApprovedDate
-        FROM HotCarcasses
+        FROM HotCarcasses WITH (READUNCOMMITTED)
         WHERE BackTagCarcassId = @carcass_id
         ORDER BY KillDate DESC
 """
@@ -33,7 +33,7 @@ _SQL_BLOCK_1_EXEC = """
             BackTagKillDate,
             ApprovedBy,
             ApprovedDate
-        FROM HotCarcasses
+        FROM HotCarcasses WITH (READUNCOMMITTED)
         WHERE BackTagCarcassId = ?
         ORDER BY KillDate DESC
 """
@@ -42,7 +42,7 @@ _SQL_BLOCK_1_EXEC = """
 def run(carcass_id: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@carcass_id", f'\"{carcass_id}\"')
+    .replace("@carcass_id", "'" + str(carcass_id).replace("'", "''") + "'")
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -65,6 +65,9 @@ def run(carcass_id: str = "") -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

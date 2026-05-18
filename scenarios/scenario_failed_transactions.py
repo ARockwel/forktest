@@ -16,7 +16,7 @@ from common import (
 )
 from db import Database
 
-import queries.query_failed_transactions as q_failed_transactions
+import queries.query_failed_transactions_failed_transactions as q_failed_transactions
 
 QUERIES = [q_failed_transactions]
 
@@ -47,6 +47,7 @@ class ScenarioFailedTransactions(tk.Frame):
 
         inp = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         inp.pack(fill="x")
+        pass  # no user parameters required
 
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
@@ -64,12 +65,11 @@ class ScenarioFailedTransactions(tk.Frame):
 
         cards_frame = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         cards_frame.pack(fill="both", expand=True)
-        card_q_failed_transactions = ResultCard(cards_frame, title=q_failed_transactions.TITLE, description=q_failed_transactions.DESCRIPTION)
-        card_q_failed_transactions.pack(fill="x", pady=(0, 8))
-        self._cards[q_failed_transactions] = card_q_failed_transactions
+        card_failed_transactions = ResultCard(cards_frame, title=q_failed_transactions.TITLE, description=q_failed_transactions.DESCRIPTION)
+        card_failed_transactions.pack(fill="x", pady=(0, 8))
+        self._cards[q_failed_transactions] = card_failed_transactions
 
     def _run(self):
-
         if not self._db.connected:
             messagebox.showerror("Not Connected", "Please connect to a plant first.")
             return
@@ -98,18 +98,19 @@ class ScenarioFailedTransactions(tk.Frame):
         def _make_skipped(reason="Skipped"):
             from common import QueryResult
             r = QueryResult()
-            r.status   = "_skipped"
+            r.status  = "_skipped"
             r.headline = reason
             return r
 
         def _thread_0():
             import threading as _t
-            _rs  = {}
-            _dfs = {}
-            _rs["q_failed_transactions"] = q_failed_transactions.run()
-            _finish_one(q_failed_transactions, _rs["q_failed_transactions"])
-            if getattr(_rs["q_failed_transactions"], "dataframe", None):
-                _dfs.update(_rs["q_failed_transactions"].dataframe)
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["failed_transactions"] = q_failed_transactions.run()
+            _finish_one(q_failed_transactions, _rs["failed_transactions"])
+            if getattr(_rs["failed_transactions"], "dataframe", None):
+                _dfs.update(_rs["failed_transactions"].dataframe)
+
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()

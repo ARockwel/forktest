@@ -16,12 +16,12 @@ from common import (
 )
 from db import Database
 
-import queries.query_missing_qa_reason_codes as q_missing_qa
+import queries.query_inventory_cant_release_missing_qa_reason_codes as q_missing_qa_reason_codes
 
-QUERIES = [q_missing_qa]
+QUERIES = [q_missing_qa_reason_codes]
 
 
-class ScenarioInventoryCantRelease(tk.Frame):
+class ScenarioInventoryCanTBeReleased(tk.Frame):
 
     TITLE          = "Inventory Can't Be Released"
     ICON           = "🔒"
@@ -47,6 +47,7 @@ class ScenarioInventoryCantRelease(tk.Frame):
 
         inp = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         inp.pack(fill="x")
+        pass  # no user parameters required
 
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
@@ -64,19 +65,18 @@ class ScenarioInventoryCantRelease(tk.Frame):
 
         cards_frame = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         cards_frame.pack(fill="both", expand=True)
-        card_q_missing_qa = ResultCard(cards_frame, title=q_missing_qa.TITLE, description=q_missing_qa.DESCRIPTION)
-        card_q_missing_qa.pack(fill="x", pady=(0, 8))
-        self._cards[q_missing_qa] = card_q_missing_qa
+        card_missing_qa_reason_codes = ResultCard(cards_frame, title=q_missing_qa_reason_codes.TITLE, description=q_missing_qa_reason_codes.DESCRIPTION)
+        card_missing_qa_reason_codes.pack(fill="x", pady=(0, 8))
+        self._cards[q_missing_qa_reason_codes] = card_missing_qa_reason_codes
 
     def _run(self):
-
         if not self._db.connected:
             messagebox.showerror("Not Connected", "Please connect to a plant first.")
             return
 
         self._run_btn.config(state="disabled", text="Running...")
         self._overall_lbl.config(text="Running checks...", fg=PALETTE["text_dim"])
-        self._cards[q_missing_qa].set_running()
+        self._cards[q_missing_qa_reason_codes].set_running()
 
         self._log.banner("Inventory Can't Be Released")
 
@@ -98,18 +98,19 @@ class ScenarioInventoryCantRelease(tk.Frame):
         def _make_skipped(reason="Skipped"):
             from common import QueryResult
             r = QueryResult()
-            r.status   = "_skipped"
+            r.status  = "_skipped"
             r.headline = reason
             return r
 
         def _thread_0():
             import threading as _t
-            _rs  = {}
-            _dfs = {}
-            _rs["q_missing_qa"] = q_missing_qa.run()
-            _finish_one(q_missing_qa, _rs["q_missing_qa"])
-            if getattr(_rs["q_missing_qa"], "dataframe", None):
-                _dfs.update(_rs["q_missing_qa"].dataframe)
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["missing_qa_reason_codes"] = q_missing_qa_reason_codes.run()
+            _finish_one(q_missing_qa_reason_codes, _rs["missing_qa_reason_codes"])
+            if getattr(_rs["missing_qa_reason_codes"], "dataframe", None):
+                _dfs.update(_rs["missing_qa_reason_codes"].dataframe)
+
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()

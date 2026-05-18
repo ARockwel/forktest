@@ -16,12 +16,12 @@ from common import (
 )
 from db import Database
 
-import queries.query_iws_delay_pending as q_iws_pending
+import queries.query_iws_delay_iws_pending as q_iws_pending
 
 QUERIES = [q_iws_pending]
 
 
-class ScenarioIWSDelay(tk.Frame):
+class ScenarioIwsMessageDelay(tk.Frame):
 
     TITLE          = "IWS Message Delay"
     ICON           = "⟳"
@@ -47,6 +47,7 @@ class ScenarioIWSDelay(tk.Frame):
 
         inp = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         inp.pack(fill="x")
+        pass  # no user parameters required
 
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
@@ -64,12 +65,11 @@ class ScenarioIWSDelay(tk.Frame):
 
         cards_frame = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         cards_frame.pack(fill="both", expand=True)
-        card_q_iws_pending = ResultCard(cards_frame, title=q_iws_pending.TITLE, description=q_iws_pending.DESCRIPTION)
-        card_q_iws_pending.pack(fill="x", pady=(0, 8))
-        self._cards[q_iws_pending] = card_q_iws_pending
+        card_iws_pending = ResultCard(cards_frame, title=q_iws_pending.TITLE, description=q_iws_pending.DESCRIPTION)
+        card_iws_pending.pack(fill="x", pady=(0, 8))
+        self._cards[q_iws_pending] = card_iws_pending
 
     def _run(self):
-
         if not self._db.connected:
             messagebox.showerror("Not Connected", "Please connect to a plant first.")
             return
@@ -98,18 +98,19 @@ class ScenarioIWSDelay(tk.Frame):
         def _make_skipped(reason="Skipped"):
             from common import QueryResult
             r = QueryResult()
-            r.status   = "_skipped"
+            r.status  = "_skipped"
             r.headline = reason
             return r
 
         def _thread_0():
             import threading as _t
-            _rs  = {}
-            _dfs = {}
-            _rs["q_iws_pending"] = q_iws_pending.run()
-            _finish_one(q_iws_pending, _rs["q_iws_pending"])
-            if getattr(_rs["q_iws_pending"], "dataframe", None):
-                _dfs.update(_rs["q_iws_pending"].dataframe)
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["iws_pending"] = q_iws_pending.run()
+            _finish_one(q_iws_pending, _rs["iws_pending"])
+            if getattr(_rs["iws_pending"], "dataframe", None):
+                _dfs.update(_rs["iws_pending"].dataframe)
+
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()

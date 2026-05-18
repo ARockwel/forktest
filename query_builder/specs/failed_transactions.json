@@ -8,7 +8,6 @@
   "business_units": [
     "Beef/Pork"
   ],
-  "file_prefix": "failed_transactions",
   "queries": [
     {
       "id": "failed_transactions",
@@ -17,7 +16,7 @@
       "sql_blocks": [
         {
           "label": "Detect Failed Transactions",
-          "sql": "select count(StagingId) as Count, PosterType\n    from MasterStaging\n    where TransferStatus = -3\n        and postertype in ('InventoryAdjustment',\n            'OrderAcknowledgement',\n            'InventoryStatus',\n            'TrailerStatus',\n            'OrderDetailChange',\n            'ShipLoad',\n            'PorkHotCarcass')\n        and FailReason <> ''\n    group by PosterType"
+          "sql": "select count(StagingId) as Count, PosterType\n    from MasterStaging WITH (READUNCOMMITTED)\n    where TransferStatus = -3\n        and postertype in ('InventoryAdjustment',\n            'OrderAcknowledgement',\n            'InventoryStatus',\n            'TrailerStatus',\n            'OrderDetailChange',\n            'ShipLoad',\n            'PorkHotCarcass')\n        and FailReason <> ''\n    group by PosterType"
         }
       ],
       "parameters": [],
@@ -29,5 +28,6 @@
       "creates_temp_tables": [],
       "reads_temp_tables": []
     }
-  ]
+  ],
+  "file_prefix": "failed_transactions"
 }

@@ -8,7 +8,6 @@
   "business_units": [
     "Beef/Pork"
   ],
-  "file_prefix": "inventory_cant_release",
   "queries": [
     {
       "id": "missing_qa_reason_codes",
@@ -17,7 +16,7 @@
       "sql_blocks": [
         {
           "label": "Find Missing QA Reason Codes",
-          "sql": "-- Branch 1: The QAStatusCode row itself has a NULL QAReasonCode column.\n    -- This means the hold was created without assigning a reason at the status level.\n    SELECT s.InventoryId\n    FROM InventoryCasesQaStatuses s\n    WHERE s.QAStatusCode  = 'HLD'\n      AND s.QAReasonCode IS NULL\n\n    UNION\n\n    -- Branch 2: No matching row exists in the reasons child table at all.\n    -- InventoryCasesQaStatusReasons stores the reason codes as separate records.\n    -- A LEFT JOIN with a NULL check finds statuses that have no reasons linked.\n    SELECT s.InventoryId\n    FROM InventoryCasesQaStatuses s\n    LEFT JOIN InventoryCasesQaStatusReasons r\n        ON  r.PlantCode   = s.PlantCode\n        AND r.InventoryId = s.InventoryId\n    WHERE s.QAStatusCode = 'HLD'\n      AND r.QAReasonCode IS NULL"
+          "sql": "-- Branch 1: The QAStatusCode row itself has a NULL QAReasonCode column.\n    -- This means the hold was created without assigning a reason at the status level.\n    SELECT s.InventoryId\n    FROM InventoryCasesQaStatuses s WITH (READUNCOMMITTED)\n    WHERE s.QAStatusCode  = 'HLD'\n      AND s.QAReasonCode IS NULL\n\n    UNION\n\n    -- Branch 2: No matching row exists in the reasons child table at all.\n    -- InventoryCasesQaStatusReasons stores the reason codes as separate records.\n    -- A LEFT JOIN with a NULL check finds statuses that have no reasons linked.\n    SELECT s.InventoryId\n    FROM InventoryCasesQaStatuses s WITH (READUNCOMMITTED)\n    LEFT JOIN InventoryCasesQaStatusReasons r WITH (READUNCOMMITTED)\n        ON  r.PlantCode   = s.PlantCode\n        AND r.InventoryId = s.InventoryId\n    WHERE s.QAStatusCode = 'HLD'\n      AND r.QAReasonCode IS NULL"
         }
       ],
       "parameters": [],
@@ -29,5 +28,6 @@
       "creates_temp_tables": [],
       "reads_temp_tables": []
     }
-  ]
+  ],
+  "file_prefix": "inventory_cant_release"
 }

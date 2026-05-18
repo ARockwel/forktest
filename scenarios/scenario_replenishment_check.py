@@ -16,12 +16,12 @@ from common import (
 )
 from db import Database
 
-import queries.query_replenishment_ineligible as q_ineligible
+import queries.query_replenishment_check_replenishment_ineligible as q_replenishment_ineligible
 
-QUERIES = [q_ineligible]
+QUERIES = [q_replenishment_ineligible]
 
 
-class ScenarioReplenishmentIneligible(tk.Frame):
+class ScenarioPalletWonTReplenishToLocation(tk.Frame):
 
     TITLE          = "Pallet Won't Replenish to Location"
     ICON           = "↑"
@@ -47,14 +47,23 @@ class ScenarioReplenishmentIneligible(tk.Frame):
 
         inp = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         inp.pack(fill="x")
-        styled_label(inp, "Pick Face Location", color=PALETTE["text"], font=FONT_HEAD).pack(anchor="w", pady=(0, 4))
-        row_location = tk.Frame(inp, bg=PALETTE["surface"])
-        row_location.pack(fill="x", pady=(0, 8))
-        self._param_vars["location"] = tk.StringVar()
-        e_location = styled_entry(row_location, width=28)
-        e_location.config(textvariable=self._param_vars["location"])
-        e_location.pack(side="left", padx=(0, 10), ipady=5)
-        e_location.bind("<Return>", lambda e: self._run())
+        styled_label(inp, "ProductId", color=PALETTE["text"], font=FONT_HEAD).pack(anchor="w", pady=(0, 4))
+        row_ProductId = tk.Frame(inp, bg=PALETTE["surface"])
+        row_ProductId.pack(fill="x", pady=(0, 8))
+        self._param_vars["ProductId"] = tk.StringVar()
+        e_ProductId = styled_entry(row_ProductId, width=28)
+        e_ProductId.config(textvariable=self._param_vars["ProductId"])
+        e_ProductId.pack(side="left", padx=(0, 10), ipady=5)
+        e_ProductId.bind("<Return>", lambda e: self._run())
+        styled_label(inp, "PickFaceLocation", color=PALETTE["text"], font=FONT_HEAD).pack(anchor="w", pady=(0, 4))
+        row_PickFaceLocation = tk.Frame(inp, bg=PALETTE["surface"])
+        row_PickFaceLocation.pack(fill="x", pady=(0, 8))
+        self._param_vars["PickFaceLocation"] = tk.StringVar()
+        e_PickFaceLocation = styled_entry(row_PickFaceLocation, width=28)
+        e_PickFaceLocation.config(textvariable=self._param_vars["PickFaceLocation"])
+        e_PickFaceLocation.pack(side="left", padx=(0, 10), ipady=5)
+        e_PickFaceLocation.bind("<Return>", lambda e: self._run())
+
         btn_row = tk.Frame(inp, bg=PALETTE["surface"])
         btn_row.pack(fill="x", pady=(4, 0))
         self._run_btn = styled_button(btn_row, "▶  Run All Checks", self._run, width=18)
@@ -71,22 +80,18 @@ class ScenarioReplenishmentIneligible(tk.Frame):
 
         cards_frame = tk.Frame(self, bg=PALETTE["surface"], padx=14)
         cards_frame.pack(fill="both", expand=True)
-        card_q_ineligible = ResultCard(cards_frame, title=q_ineligible.TITLE, description=q_ineligible.DESCRIPTION)
-        card_q_ineligible.pack(fill="x", pady=(0, 8))
-        self._cards[q_ineligible] = card_q_ineligible
+        card_replenishment_ineligible = ResultCard(cards_frame, title=q_replenishment_ineligible.TITLE, description=q_replenishment_ineligible.DESCRIPTION)
+        card_replenishment_ineligible.pack(fill="x", pady=(0, 8))
+        self._cards[q_replenishment_ineligible] = card_replenishment_ineligible
 
     def _run(self):
-        location = self._param_vars.get("location", tk.StringVar()).get().strip()
-        if not location:
-            messagebox.showwarning("Input Required", "Please enter a pick face location.")
-            return
         if not self._db.connected:
             messagebox.showerror("Not Connected", "Please connect to a plant first.")
             return
 
         self._run_btn.config(state="disabled", text="Running...")
         self._overall_lbl.config(text="Running checks...", fg=PALETTE["text_dim"])
-        self._cards[q_ineligible].set_running()
+        self._cards[q_replenishment_ineligible].set_running()
 
         self._log.banner("Pallet Won't Replenish to Location")
 
@@ -108,18 +113,19 @@ class ScenarioReplenishmentIneligible(tk.Frame):
         def _make_skipped(reason="Skipped"):
             from common import QueryResult
             r = QueryResult()
-            r.status   = "_skipped"
+            r.status  = "_skipped"
             r.headline = reason
             return r
 
         def _thread_0():
             import threading as _t
-            _rs  = {}
-            _dfs = {}
-            _rs["q_ineligible"] = q_ineligible.run(self._param_vars.get("location", tk.StringVar()).get().strip())
-            _finish_one(q_ineligible, _rs["q_ineligible"])
-            if getattr(_rs["q_ineligible"], "dataframe", None):
-                _dfs.update(_rs["q_ineligible"].dataframe)
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["replenishment_ineligible"] = q_replenishment_ineligible.run(self._param_vars.get("ProductId", tk.StringVar()).get().strip(), self._param_vars.get("PickFaceLocation", tk.StringVar()).get().strip())
+            _finish_one(q_replenishment_ineligible, _rs["replenishment_ineligible"])
+            if getattr(_rs["replenishment_ineligible"], "dataframe", None):
+                _dfs.update(_rs["replenishment_ineligible"].dataframe)
+
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()

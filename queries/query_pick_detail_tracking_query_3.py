@@ -80,6 +80,9 @@ def run(barcode: str = "", warehouselocationid: str = "") -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

@@ -19,7 +19,7 @@ SQL_BLOCK_1 = """
             ScheduleGroup,
             PurchaseGroup,
             HeadCount
-        FROM KillGroups
+        FROM KillGroups WITH (READUNCOMMITTED)
         WHERE KillGroupId = @killgroupid
 """
 
@@ -28,7 +28,7 @@ _SQL_BLOCK_1_EXEC = """
             ScheduleGroup,
             PurchaseGroup,
             HeadCount
-        FROM KillGroups
+        FROM KillGroups WITH (READUNCOMMITTED)
         WHERE KillGroupId = @killgroupid
 """
 
@@ -60,6 +60,9 @@ def run(killgroupid: str = "") -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

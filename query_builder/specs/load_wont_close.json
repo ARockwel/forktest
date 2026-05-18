@@ -8,7 +8,6 @@
   "business_units": [
     "Beef/Pork"
   ],
-  "file_prefix": "load_wont_close",
   "queries": [
     {
       "id": "missing_shipment",
@@ -17,7 +16,7 @@
       "sql_blocks": [
         {
           "label": "Check Shipment",
-          "sql": "SELECT shipmentNumber\n    FROM shipmentStopDeliveries\n    WHERE DeliveryNumber = @delivery_number"
+          "sql": "SELECT shipmentNumber\n    FROM shipmentStopDeliveries WITH (READUNCOMMITTED)\n    WHERE DeliveryNumber = @delivery_number"
         }
       ],
       "parameters": [
@@ -42,7 +41,7 @@
       "sql_blocks": [
         {
           "label": "Check Trailer",
-          "sql": "SELECT s.shipmentNumber, s.trailerid\n    FROM shipments s\n    WHERE s.shipmentNumber IN (\n        SELECT shipmentNumber\n        FROM shipmentStopDeliveries\n        WHERE DeliveryNumber = @delivery_number\n    )"
+          "sql": "SELECT s.shipmentNumber, s.trailerid\n    FROM shipments s WITH (READUNCOMMITTED)\n    WHERE s.shipmentNumber IN (\n        SELECT shipmentNumber\n        FROM shipmentStopDeliveries WITH (READUNCOMMITTED)\n        WHERE DeliveryNumber = @delivery_number\n    )"
         }
       ],
       "parameters": [
@@ -67,7 +66,7 @@
       "sql_blocks": [
         {
           "label": "Check Trailer Capacity",
-          "sql": "SELECT   s.trailerid\n    FROM     shipments AS s\n    LEFT JOIN trailers AS t ON s.trailerId = t.trailerId\n    LEFT JOIN shipmentStopDeliveries AS ssd ON s.shipmentNumber = ssd.shipmentNumber\n    WHERE    ssd.DeliveryNumber = @delivery_number\n        AND    (t.trailerCapacity IS NULL OR t.trailerCapacity = 0)\n    ORDER BY s.shipmentNumber"
+          "sql": "SELECT   s.trailerid\n    FROM     shipments AS s WITH (READUNCOMMITTED)\n    LEFT JOIN trailers AS t WITH (READUNCOMMITTED) ON s.trailerId = t.trailerId\n    LEFT JOIN shipmentStopDeliveries AS ssd WITH (READUNCOMMITTED) ON s.shipmentNumber = ssd.shipmentNumber\n    WHERE    ssd.DeliveryNumber = @delivery_number\n        AND    (t.trailerCapacity IS NULL OR t.trailerCapacity = 0)\n    ORDER BY s.shipmentNumber"
         }
       ],
       "parameters": [
@@ -92,7 +91,7 @@
       "sql_blocks": [
         {
           "label": "Check Delivery Allocations",
-          "sql": "SELECT   v.inventoryid\n    FROM     vwInventoryDetails AS v\n    WHERE    v.exitdeliverynumber = @delivery_number\n      AND    NOT EXISTS (\n                 SELECT 1\n                 FROM   deliveryallocations AS da\n                 WHERE  da.inventoryid = v.inventoryid\n             )\n    ORDER BY v.inventoryid"
+          "sql": "SELECT   v.inventoryid\n    FROM     vwInventoryDetails AS v WITH (READUNCOMMITTED)\n    WHERE    v.exitdeliverynumber = @delivery_number\n      AND    NOT EXISTS (\n                 SELECT 1\n                 FROM   deliveryallocations AS da\n                 WHERE  da.inventoryid = v.inventoryid\n             )\n    ORDER BY v.inventoryid"
         }
       ],
       "parameters": [
@@ -110,5 +109,6 @@
       "creates_temp_tables": [],
       "reads_temp_tables": []
     }
-  ]
+  ],
+  "file_prefix": "load_wont_close"
 }

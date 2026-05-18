@@ -46,7 +46,7 @@ SQL_BLOCK_1 = """
             1, 1, ''
         )) AS FailureReasons
 
-    FROM ReplenPalletDiagnostics
+    FROM ReplenPalletDiagnostics WITH (READUNCOMMITTED)
     GROUP BY PalletNumber
     ORDER BY PalletNumber;
 """
@@ -83,7 +83,7 @@ _SQL_BLOCK_1_EXEC = """
             1, 1, ''
         )) AS FailureReasons
 
-    FROM ReplenPalletDiagnostics
+    FROM ReplenPalletDiagnostics WITH (READUNCOMMITTED)
     GROUP BY PalletNumber
     ORDER BY PalletNumber;
 """
@@ -122,6 +122,9 @@ def run(df: dict | None = None) -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

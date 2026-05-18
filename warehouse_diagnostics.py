@@ -34,10 +34,10 @@ def _load_business_units() -> list[str]:
 BUSINESS_UNITS = _load_business_units()
 
 # ── Register scenarios here ───────────────────────────────────────────────────
-from scenarios.scenario_load_wont_close import ScenarioLoadWontClose
-from scenarios.scenario_inventory_cant_release import ScenarioInventoryCantRelease
-from scenarios.scenario_iws_delay import ScenarioIWSDelay
-from scenarios.scenario_replenishment_check import ScenarioReplenishmentIneligible
+from scenarios.scenario_load_wont_close import ScenarioLoadWonTClose
+from scenarios.scenario_inventory_cant_release import ScenarioInventoryCanTBeReleased
+from scenarios.scenario_iws_delay import ScenarioIwsMessageDelay
+from scenarios.scenario_replenishment_check import ScenarioPalletWonTReplenishToLocation
 from scenarios.scenario_duplicate_inventory import ScenarioDuplicateInventory
 from scenarios.scenario_missing_carcasses import ScenarioMissingCarcasses
 from scenarios.scenario_failed_transactions import ScenarioFailedTransactions
@@ -52,10 +52,10 @@ from scenarios.scenario_automove_check import ScenarioAutomoveCheck
 from scenarios.scenario_pick_detail_tracking import ScenarioPickDetailTracking
 
 SCENARIOS = [
-    ScenarioLoadWontClose,
-    ScenarioInventoryCantRelease,
-    ScenarioIWSDelay,
-    ScenarioReplenishmentIneligible,
+    ScenarioLoadWonTClose,
+    ScenarioInventoryCanTBeReleased,
+    ScenarioIwsMessageDelay,
+    ScenarioPalletWonTReplenishToLocation,
     ScenarioDuplicateInventory,
     ScenarioMissingCarcasses,
     ScenarioFailedTransactions,

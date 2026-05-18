@@ -225,12 +225,15 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
             tbl_key = tbl.lstrip('#').upper()
             exec_lines += [
                 f'            _df_cur = db.conn.cursor()',
-                f'            _df_cur.execute("SELECT * FROM {tbl}")',
-                f'            _df_cols = [c[0] for c in _df_cur.description]',
-                f'            _df_rows = _df_cur.fetchall()',
-                f'            result.dataframe["{tbl_key}"] = _pd.DataFrame(',
-                f'                [list(r) for r in _df_rows], columns=_df_cols',
-                f'            )',
+                f'            try:',
+                f'                _df_cur.execute("SELECT * FROM {tbl}")',
+                f'                _df_cols = [c[0] for c in _df_cur.description]',
+                f'                _df_rows = _df_cur.fetchall()',
+                f'                result.dataframe["{tbl_key}"] = _pd.DataFrame(',
+                f'                    [list(r) for r in _df_rows], columns=_df_cols',
+                f'                )',
+                f'            finally:',
+                f'                _df_cur.close()',
             ]
         exec_lines += [
             '        except Exception:',
@@ -333,6 +336,9 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
         '        result.headline = f"{TITLE}: Query error — {exc}"',
         '        result.add_message("error", result.headline)',
         '        return result',
+        '    finally:',
+        '        if cursor:',
+        '            cursor.close()',
         '',
         '    if not rows:',
         '        result.status   = "ok"',

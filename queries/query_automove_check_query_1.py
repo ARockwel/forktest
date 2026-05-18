@@ -88,11 +88,11 @@ SQL_BLOCK_1 = """
         ------------------------------------------------------------------
         -- Replenishment Zone only (FIXED STRING_SPLIT)
         ------------------------------------------------------------------
-        JOIN WarehouseAreaLocations wal
+        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
             ON wal.LocationId = vid.WarehouseLocationId
            AND wal.ZoneId IN (
                 SELECT CAST(ss.value AS INT)
-                FROM WorkstationApplicationSettings was
+                FROM WorkstationApplicationSettings was WITH (READUNCOMMITTED)
                 CROSS APPLY STRING_SPLIT(was.Value, ',') ss
                 WHERE was.PackageName = 'Protein.ShopFloor.Dashboard'
                   AND was.Code = 'ReplenishmentZones'
@@ -101,29 +101,29 @@ SQL_BLOCK_1 = """
         ------------------------------------------------------------------
         -- Delivery / Order context
         ------------------------------------------------------------------
-        LEFT JOIN DeliveryLines dl
+        LEFT JOIN DeliveryLines dl WITH (READUNCOMMITTED)
             ON dl.ProductId = vid.ProductId
            AND dl.DeliveryNumber = @DeliveryNumber
 
-        LEFT JOIN OrderLines ol
+        LEFT JOIN OrderLines ol WITH (READUNCOMMITTED)
             ON ol.OrderLineNumber = dl.OrderLineNumber
            AND ol.OrderNumber = (
                 SELECT OrderNumber
-                FROM Deliveries
+                FROM Deliveries WITH (READUNCOMMITTED)
                 WHERE DeliveryNumber = @DeliveryNumber
            )
 
         ------------------------------------------------------------------
         -- Existing commitment
         ------------------------------------------------------------------
-        LEFT JOIN vwInventoryDetails invCommitted
+        LEFT JOIN vwInventoryDetails invCommitted WITH (READUNCOMMITTED)
             ON invCommitted.PalletNumber = vid.PalletNumber
            AND invCommitted.DeliveryNumber IS NOT NULL
 
         ------------------------------------------------------------------
         -- Existing task
         ------------------------------------------------------------------
-        LEFT JOIN DirectedTasks dtExisting
+        LEFT JOIN DirectedTasks dtExisting WITH (READUNCOMMITTED)
             ON dtExisting.PalletNumber = vid.PalletNumber
            AND dtExisting.StatusId <> 7
 """
@@ -202,11 +202,11 @@ _SQL_BLOCK_1_EXEC = """
         ------------------------------------------------------------------
         -- Replenishment Zone only (FIXED STRING_SPLIT)
         ------------------------------------------------------------------
-        JOIN WarehouseAreaLocations wal
+        JOIN WarehouseAreaLocations wal WITH (READUNCOMMITTED)
             ON wal.LocationId = vid.WarehouseLocationId
            AND wal.ZoneId IN (
                 SELECT CAST(ss.value AS INT)
-                FROM WorkstationApplicationSettings was
+                FROM WorkstationApplicationSettings was WITH (READUNCOMMITTED)
                 CROSS APPLY STRING_SPLIT(was.Value, ',') ss
                 WHERE was.PackageName = 'Protein.ShopFloor.Dashboard'
                   AND was.Code = 'ReplenishmentZones'
@@ -215,29 +215,29 @@ _SQL_BLOCK_1_EXEC = """
         ------------------------------------------------------------------
         -- Delivery / Order context
         ------------------------------------------------------------------
-        LEFT JOIN DeliveryLines dl
+        LEFT JOIN DeliveryLines dl WITH (READUNCOMMITTED)
             ON dl.ProductId = vid.ProductId
            AND dl.DeliveryNumber = ?
 
-        LEFT JOIN OrderLines ol
+        LEFT JOIN OrderLines ol WITH (READUNCOMMITTED)
             ON ol.OrderLineNumber = dl.OrderLineNumber
            AND ol.OrderNumber = (
                 SELECT OrderNumber
-                FROM Deliveries
+                FROM Deliveries WITH (READUNCOMMITTED)
                 WHERE DeliveryNumber = ?
            )
 
         ------------------------------------------------------------------
         -- Existing commitment
         ------------------------------------------------------------------
-        LEFT JOIN vwInventoryDetails invCommitted
+        LEFT JOIN vwInventoryDetails invCommitted WITH (READUNCOMMITTED)
             ON invCommitted.PalletNumber = vid.PalletNumber
            AND invCommitted.DeliveryNumber IS NOT NULL
 
         ------------------------------------------------------------------
         -- Existing task
         ------------------------------------------------------------------
-        LEFT JOIN DirectedTasks dtExisting
+        LEFT JOIN DirectedTasks dtExisting WITH (READUNCOMMITTED)
             ON dtExisting.PalletNumber = vid.PalletNumber
            AND dtExisting.StatusId <> 7
 """
@@ -246,7 +246,7 @@ _SQL_BLOCK_1_EXEC = """
 def run(DeliveryNumber: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@DeliveryNumber", f'\"{DeliveryNumber}\"')
+    .replace("@DeliveryNumber", "'" + str(DeliveryNumber).replace("'", "''") + "'")
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -277,6 +277,9 @@ def run(DeliveryNumber: str = "") -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

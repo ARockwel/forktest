@@ -21,7 +21,7 @@ SQL_BLOCK_1 = """
             ApprovedBy,
             ApprovedDate,
             CpsTransfer
-        FROM EpVCarcasses
+        FROM EpVCarcasses WITH (READUNCOMMITTED)
         WHERE CarcassId = @carcass_id
 """
 
@@ -32,7 +32,7 @@ _SQL_BLOCK_1_EXEC = """
             ApprovedBy,
             ApprovedDate,
             CpsTransfer
-        FROM EpVCarcasses
+        FROM EpVCarcasses WITH (READUNCOMMITTED)
         WHERE CarcassId = ?
 """
 
@@ -40,7 +40,7 @@ _SQL_BLOCK_1_EXEC = """
 def run(carcass_id: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@carcass_id", f'\"{carcass_id}\"')
+    .replace("@carcass_id", "'" + str(carcass_id).replace("'", "''") + "'")
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -63,6 +63,9 @@ def run(carcass_id: str = "") -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"

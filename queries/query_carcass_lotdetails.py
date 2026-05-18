@@ -18,7 +18,7 @@ SQL_BLOCK_1 = """
     SELECT
             ScheduledHeadCount,
             ReceivedHeadCount
-        FROM LotDetails
+        FROM LotDetails WITH (READUNCOMMITTED)
         WHERE ScheduleGroup = @schedulegroup
 """
 
@@ -26,7 +26,7 @@ _SQL_BLOCK_1_EXEC = """
     SELECT
             ScheduledHeadCount,
             ReceivedHeadCount
-        FROM LotDetails
+        FROM LotDetails WITH (READUNCOMMITTED)
         WHERE ScheduleGroup = @schedulegroup
 """
 
@@ -58,6 +58,9 @@ def run(schedulegroup: str = "") -> QueryResult:
         result.headline = f"{TITLE}: Query error — {exc}"
         result.add_message("error", result.headline)
         return result
+    finally:
+        if cursor:
+            cursor.close()
 
     if not rows:
         result.status   = "ok"
