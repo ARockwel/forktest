@@ -444,10 +444,7 @@ class WarehouseDiagnosticsApp(tk.Tk):
         from tkinter import messagebox
         messagebox.showinfo(
             "Update Available",
-            "A new version of Warehouse Diagnostics is available.\n\n",
-            "Close the app and run [run_wdt.bat] to update automatically.\n",
-            "OR delete the app and reclone from the repo.",
-            icon="info",
+            "A new version of Warehouse Diagnostics is available.\n\nClose the app and run [run_wdt.bat] to update automatically.\nOR delete the app and reclone from the repo.",
         )
 
     def _build_ui(self):
