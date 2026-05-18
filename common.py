@@ -473,7 +473,16 @@ class ResultCard(tk.Frame):
 
     def _copy_query(self):
         self.clipboard_clear()
-        self.clipboard_append(self._sql)
+
+        # Only normalize smart single quotes → ASCII single quote
+        normalized_sql = (
+            self._sql
+            .replace("\u2018", "'")  # left single quote
+            .replace("\u2019", "'")  # right single quote
+        )
+
+        self.clipboard_append(normalized_sql)
+
         self._copy_query_btn.config(text="Copied!")
         self.after(1800, lambda: self._copy_query_btn.config(text="Copy Query"))
 

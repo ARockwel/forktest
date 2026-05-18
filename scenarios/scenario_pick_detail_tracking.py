@@ -19,8 +19,10 @@ from db import Database
 import queries.query_pick_detail_tracking_query_1 as q_query_1
 import queries.query_pick_detail_tracking_query_2 as q_query_2
 import queries.query_pick_detail_tracking_query_3 as q_query_3
+import queries.query_pick_detail_tracking_query_5 as q_query_5
+import queries.query_pick_detail_tracking_query_4 as q_query_4
 
-QUERIES = [q_query_1, q_query_2, q_query_3]
+QUERIES = [q_query_1, q_query_2, q_query_3, q_query_5, q_query_4]
 
 
 class ScenarioPickDetailTracking(tk.Frame):
@@ -99,6 +101,12 @@ class ScenarioPickDetailTracking(tk.Frame):
         card_query_3 = ResultCard(cards_frame, title=q_query_3.TITLE, description=q_query_3.DESCRIPTION)
         card_query_3.pack(fill="x", pady=(0, 8))
         self._cards[q_query_3] = card_query_3
+        card_query_5 = ResultCard(cards_frame, title=q_query_5.TITLE, description=q_query_5.DESCRIPTION)
+        card_query_5.pack(fill="x", pady=(0, 8))
+        self._cards[q_query_5] = card_query_5
+        card_query_4 = ResultCard(cards_frame, title=q_query_4.TITLE, description=q_query_4.DESCRIPTION)
+        card_query_4.pack(fill="x", pady=(0, 8))
+        self._cards[q_query_4] = card_query_4
 
     def _run(self):
         if not self._db.connected:
@@ -110,11 +118,13 @@ class ScenarioPickDetailTracking(tk.Frame):
         self._cards[q_query_1].set_running()
         self._cards[q_query_2].set_running()
         self._cards[q_query_3].set_running()
+        self._cards[q_query_5].set_running()
+        self._cards[q_query_4].set_running()
 
         self._log.banner("Pick Detail Tracking")
 
         import threading as _threading
-        total_queries = 3
+        total_queries = 5
         completed     = [0]
         results_store = {}
         lock          = _threading.Lock()
@@ -162,11 +172,31 @@ class ScenarioPickDetailTracking(tk.Frame):
             if getattr(_rs["query_3"], "dataframe", None):
                 _dfs.update(_rs["query_3"].dataframe)
 
+        def _thread_3():
+            import threading as _t
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["query_5"] = q_query_5.run(self._param_vars.get("pickid", tk.StringVar()).get().strip(), self._param_vars.get("warehouselocationid", tk.StringVar()).get().strip(), self._param_vars.get("barcode", tk.StringVar()).get().strip())
+            _finish_one(q_query_5, _rs["query_5"])
+            if getattr(_rs["query_5"], "dataframe", None):
+                _dfs.update(_rs["query_5"].dataframe)
+
+        def _thread_4():
+            import threading as _t
+            _rs  = {}   # query_id → QueryResult
+            _dfs = {}   # TBL_KEY  → pd.DataFrame (from temp table parents)
+            _rs["query_4"] = q_query_4.run(self._param_vars.get("pickid", tk.StringVar()).get().strip(), self._param_vars.get("warehouselocationid", tk.StringVar()).get().strip(), self._param_vars.get("barcode", tk.StringVar()).get().strip())
+            _finish_one(q_query_4, _rs["query_4"])
+            if getattr(_rs["query_4"], "dataframe", None):
+                _dfs.update(_rs["query_4"].dataframe)
+
 
         import threading as _t
         _t.Thread(target=_thread_0, daemon=True).start()
         _t.Thread(target=_thread_1, daemon=True).start()
         _t.Thread(target=_thread_2, daemon=True).start()
+        _t.Thread(target=_thread_3, daemon=True).start()
+        _t.Thread(target=_thread_4, daemon=True).start()
 
     def _apply_result(self, qry, result):
         card = self._cards.get(qry)

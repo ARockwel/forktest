@@ -56,8 +56,8 @@ _SQL_BLOCK_1_EXEC = """
 def run(barcode: str = "", warehouselocationid: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@barcode", f'\"{barcode}\"')\
-    .replace("@warehouselocationid", f'\"{warehouselocationid}\"')
+    .replace("@barcode", "'" + str(barcode).replace("'", "''") + "'")\
+    .replace("@warehouselocationid", "'" + str(warehouselocationid).replace("'", "''") + "'")
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:

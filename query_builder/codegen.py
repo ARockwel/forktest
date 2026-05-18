@@ -116,7 +116,10 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
     for i, block in enumerate(query.sql_blocks, 1):
         const_name = f"SQL_BLOCK_{i}"
         # Keep original @variable SQL for the constant (human-readable)
-        sql_repr = '"""\n' + textwrap.indent(block.sql.strip(), '    ') + '\n"""'
+        import html
+        clean_sql = html.unescape(block.sql)
+
+        sql_repr = '"""\n' + textwrap.indent(clean_sql.strip(), '    ') + '\n"""'
         block_consts.append(f"# {block.label}\n{const_name} = {sql_repr}")
 
         # Determine which params this block uses, split by type
@@ -132,7 +135,7 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
         # Build the EXEC SQL constant: only replace user @params with ?
         # Injected @params are left as-is and substituted at runtime
         positional_sql_const = f"_{const_name}_EXEC"
-        positional_sql = _sql_to_positional(block.sql.strip(), block_user_params)
+        positional_sql = _sql_to_positional(clean_sql.strip(), block_user_params)
         positional_sql_repr = '"""\n' + textwrap.indent(positional_sql, '    ') + '\n"""'
         block_consts.append(f"{positional_sql_const} = {positional_sql_repr}")
 
@@ -165,9 +168,10 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
         # in the SQL, _sql_to_positional emits N '?' placeholders so pyodbc needs the
         # value passed N times.
         exec_args = []
-        for name in block_user_params:
-            count = len(re.findall(r'@' + re.escape(name) + r'\b', block.sql, re.IGNORECASE))
-            exec_args.extend([name] * max(count, 1))
+        for match in re.finditer(r'@([a-zA-Z0-9_]+)\b', block.sql, re.IGNORECASE):
+            name = match.group(1)
+            if name in block_user_params:
+                exec_args.append(name)
 
         if exec_args:
             if len(exec_args) == 1:
@@ -274,7 +278,9 @@ def generate_query_file(scenario_prefix: str, query: QuerySpec) -> str:
         if name in takes_param_names:
             display_sql_parts.append(f'    .replace("@{name}", {name})')
         else:
-            display_sql_parts.append(f'    .replace("@{name}", f\'\\"{{{name}}}\\"\')' )
+            display_sql_parts.append(
+                f'    .replace("@{name}", "\'" + str({name}).replace("\'", "\'\'") + "\'")'
+            )
     if display_sql_parts:
         display_sql = (
             "    result.sql = SQL_BLOCK_" + str(len(query.sql_blocks)) + ".strip()\\\n"

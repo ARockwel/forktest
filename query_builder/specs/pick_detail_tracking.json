@@ -51,7 +51,7 @@
       "sql_blocks": [
         {
           "label": "Block 1",
-          "sql": "SELECT *\nFROM PalletPlanningPickDetails d\nWHERE \n(\n    -- Case 1: barcode provided \u2192 use barcode to determine group\n    (@barcode <> '' AND d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.barcode = @barcode\n    ))\n\n    OR\n\n    -- Case 2: barcode empty \u2192 use location instead\n    (@barcode = '' AND @warehouselocationid <> '' AND d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.SourceLocation = @warehouselocationid\n    ))\n)\nAND (\n    -- pickid still optional and independent\n    @pickid = '' OR d.PickGroupId IN (\n        SELECT g.PickGroupId\n        FROM PalletPlanningPickGroups g\n        WHERE g.PickId = @pickid\n    )\n)"
+          "sql": "SELECT *\nFROM PalletPlanningPickDetails d\nWHERE \n(\n    (@barcode = '' AND @warehouselocationid = '')\n\n    OR\n\n    (@barcode <> '' AND d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.barcode = @barcode\n    ))\n\n    OR\n\n    (@barcode = '' AND @warehouselocationid <> '' AND d.pickgroupid IN (\n        SELECT pd.pickgroupid\n        FROM PalletPlanningPickDetails pd\n        WHERE pd.SourceLocation = @warehouselocationid\n    ))\n)\nAND\n(\n    @pickid = '' \n    OR d.PickGroupId IN (\n        SELECT g.PickGroupId\n        FROM PalletPlanningPickGroups g\n        WHERE g.PickId = @pickid\n    )\n)"
         }
       ],
       "parameters": [
@@ -98,6 +98,76 @@
         {
           "name": "warehouselocationid",
           "label": "warehouselocationid",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "query_5",
+      "title": "Raw Interface Data pick info",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": ";WITH json_data AS (\n    SELECT data\n    FROM RawInterfaceData WITH (READUNCOMMITTED)\n    WHERE ServiceId = 'IWSOutbound_PickCommand'\n      AND CreatedDate > DATEADD(day, -3, GETDATE())\n      AND StatusId = 3\n),\nresults AS (\n    SELECT \n        jt.PickId,\n        jt.ReleasePriority,\n        jt.ExportItem,\n        jt.ShipPalletType,\n        jt.Destination,\n        pd.DeliveryNumber,\n        pd.DeliveryLineNumber,\n        pd.PickSequenceNumber,\n        pd.LocationId,\n        pd.Barcode\n    FROM json_data AS jd\n    CROSS APPLY OPENJSON(jd.data) WITH (\n        PickId INT '$.PickId',\n        ReleasePriority INT '$.ReleasePriority',\n        ExportItem VARCHAR(1) '$.ExportItem',\n        ShipPalletType VARCHAR(10) '$.ShipPalletType',\n        Destination VARCHAR(10) '$.Destination',\n        PickDetail NVARCHAR(MAX) '$.PickDetail' AS JSON\n    ) AS jt\n    CROSS APPLY OPENJSON(jt.PickDetail) WITH (\n        DeliveryNumber VARCHAR(10) '$.DeliveryNumber',\n        DeliveryLineNumber VARCHAR(10) '$.DeliveryLineNumber',\n        PickSequenceNumber INT '$.PickSequenceNumber',\n        LocationId VARCHAR(20) '$.LocationId',\n        Barcode VARCHAR(50) '$.Barcode'\n    ) AS pd\n)\nSELECT *\nFROM results\nWHERE \n    (@pickid = '' OR PickId = @pickid)\n    AND (@warehouselocationid = '' OR LocationId = @warehouselocationid)\n    AND (@barcode = '' OR Barcode = @barcode);"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "pickid",
+          "label": "pickid",
+          "default": ""
+        },
+        {
+          "name": "warehouselocationid",
+          "label": "warehouselocationid",
+          "default": ""
+        },
+        {
+          "name": "barcode",
+          "label": "barcode",
+          "default": ""
+        }
+      ],
+      "gives": [],
+      "takes": [],
+      "creates_dataframe": false,
+      "dataframe_key": "",
+      "reads_dataframe_keys": [],
+      "creates_temp_tables": [],
+      "reads_temp_tables": []
+    },
+    {
+      "id": "query_4",
+      "title": "Abort Reasons",
+      "description": "",
+      "sql_blocks": [
+        {
+          "label": "Block 1",
+          "sql": ";WITH json_data AS (\n    SELECT data\n    FROM RawInterfaceData WITH (READUNCOMMITTED)\n    WHERE ServiceId = 'IWSPickAbort'\n      AND CreatedDate > DATEADD(day, -3, GETDATE())\n      AND StatusId = 3\n),\nresults AS (\n    SELECT \n        jt.UniqueIdentifier,\n        jt.PickAbortId,\n        jt.DeliveryNumber,\n        jt.DeliveryLineNumber,\n        jt.PickId,\n        jt.PickGroupId,\n        jt.LocationId,\n        jt.InventoryType,\n        jt.Barcode,\n        jt.NeedReplacementBox,\n        jt.AbortReasonId,\n        jt.AbortReason\n    FROM json_data AS jd\n    CROSS APPLY OPENJSON(jd.data) WITH (\n        UniqueIdentifier VARCHAR(MAX) '$.UniqueIdentifier',\n        PickAbortId VARCHAR(MAX) '$.PickAbortId',\n        DeliveryNumber VARCHAR(MAX) '$.DeliveryNumber',\n        DeliveryLineNumber VARCHAR(MAX) '$.DeliveryLineNumber',\n        PickId INT '$.PickId',\n        PickGroupId INT '$.PickGroupId',\n        LocationId VARCHAR(MAX) '$.LocationId',\n        InventoryType VARCHAR(MAX) '$.InventoryType',\n        Barcode VARCHAR(MAX) '$.Barcode',\n        NeedReplacementBox VARCHAR(MAX) '$.NeedReplacementBox',\n        AbortReasonId VARCHAR(MAX) '$.AbortReasonId',\n        AbortReason VARCHAR(MAX) '$.AbortReason'\n    ) AS jt\n)\nSELECT *\nFROM results\nWHERE \n    (@pickid = '' OR PickId = @pickid)\n    AND (@warehouselocationid = '' OR LocationId = @warehouselocationid)\n    AND (@barcode = '' OR Barcode = @barcode);"
+        }
+      ],
+      "parameters": [
+        {
+          "name": "pickid",
+          "label": "pickid",
+          "default": ""
+        },
+        {
+          "name": "warehouselocationid",
+          "label": "warehouselocationid",
+          "default": ""
+        },
+        {
+          "name": "barcode",
+          "label": "barcode",
           "default": ""
         }
       ],

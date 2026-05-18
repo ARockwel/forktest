@@ -19,7 +19,10 @@ SQL_BLOCK_1 = """
     FROM PalletPlanningPickDetails d
     WHERE 
     (
-        -- Case 1: barcode provided → use barcode to determine group
+        (@barcode = '' AND @warehouselocationid = '')
+
+        OR
+
         (@barcode <> '' AND d.pickgroupid IN (
             SELECT pd.pickgroupid
             FROM PalletPlanningPickDetails pd
@@ -28,16 +31,16 @@ SQL_BLOCK_1 = """
 
         OR
 
-        -- Case 2: barcode empty → use location instead
         (@barcode = '' AND @warehouselocationid <> '' AND d.pickgroupid IN (
             SELECT pd.pickgroupid
             FROM PalletPlanningPickDetails pd
             WHERE pd.SourceLocation = @warehouselocationid
         ))
     )
-    AND (
-        -- pickid still optional and independent
-        @pickid = '' OR d.PickGroupId IN (
+    AND
+    (
+        @pickid = '' 
+        OR d.PickGroupId IN (
             SELECT g.PickGroupId
             FROM PalletPlanningPickGroups g
             WHERE g.PickId = @pickid
@@ -50,7 +53,10 @@ _SQL_BLOCK_1_EXEC = """
     FROM PalletPlanningPickDetails d
     WHERE 
     (
-        -- Case 1: barcode provided → use barcode to determine group
+        (? = '' AND ? = '')
+
+        OR
+
         (? <> '' AND d.pickgroupid IN (
             SELECT pd.pickgroupid
             FROM PalletPlanningPickDetails pd
@@ -59,16 +65,16 @@ _SQL_BLOCK_1_EXEC = """
 
         OR
 
-        -- Case 2: barcode empty → use location instead
         (? = '' AND ? <> '' AND d.pickgroupid IN (
             SELECT pd.pickgroupid
             FROM PalletPlanningPickDetails pd
             WHERE pd.SourceLocation = ?
         ))
     )
-    AND (
-        -- pickid still optional and independent
-        ? = '' OR d.PickGroupId IN (
+    AND
+    (
+        ? = '' 
+        OR d.PickGroupId IN (
             SELECT g.PickGroupId
             FROM PalletPlanningPickGroups g
             WHERE g.PickId = ?
@@ -80,9 +86,9 @@ _SQL_BLOCK_1_EXEC = """
 def run(barcode: str = "", warehouselocationid: str = "", pickid: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@barcode", f'\"{barcode}\"')\
-    .replace("@warehouselocationid", f'\"{warehouselocationid}\"')\
-    .replace("@pickid", f'\"{pickid}\"')
+    .replace("@barcode", "'" + str(barcode).replace("'", "''") + "'")\
+    .replace("@warehouselocationid", "'" + str(warehouselocationid).replace("'", "''") + "'")\
+    .replace("@pickid", "'" + str(pickid).replace("'", "''") + "'")
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -94,7 +100,7 @@ def run(barcode: str = "", warehouselocationid: str = "", pickid: str = "") -> Q
             return result
 
         _sql_block_1 = _SQL_BLOCK_1_EXEC
-        cursor.execute(_sql_block_1, (barcode, barcode, barcode, warehouselocationid, warehouselocationid, pickid, pickid,))
+        cursor.execute(_sql_block_1, (barcode, warehouselocationid, barcode, barcode, barcode, warehouselocationid, warehouselocationid, pickid, pickid,))
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
         result.cols = cols

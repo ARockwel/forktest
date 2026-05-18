@@ -64,9 +64,9 @@ _SQL_BLOCK_1_EXEC = """
 def run(barcode: str = "", pickid: str = "", warehouselocationid: str = "") -> QueryResult:
     result = QueryResult()
     result.sql = SQL_BLOCK_1.strip()\
-    .replace("@barcode", f'\"{barcode}\"')\
-    .replace("@pickid", f'\"{pickid}\"')\
-    .replace("@warehouselocationid", f'\"{warehouselocationid}\"')
+    .replace("@barcode", "'" + str(barcode).replace("'", "''") + "'")\
+    .replace("@pickid", "'" + str(pickid).replace("'", "''") + "'")\
+    .replace("@warehouselocationid", "'" + str(warehouselocationid).replace("'", "''") + "'")
     result.add_message("info", f"[{TITLE}] Running...")
 
     try:
@@ -78,7 +78,7 @@ def run(barcode: str = "", pickid: str = "", warehouselocationid: str = "") -> Q
             return result
 
         _sql_block_1 = _SQL_BLOCK_1_EXEC
-        cursor.execute(_sql_block_1, (barcode, barcode, barcode, pickid, pickid, pickid, warehouselocationid, warehouselocationid,))
+        cursor.execute(_sql_block_1, (barcode, barcode, pickid, pickid, barcode, pickid, warehouselocationid, warehouselocationid,))
         rows = cursor.fetchall()
         cols = [col[0] for col in cursor.description]
         result.cols = cols
