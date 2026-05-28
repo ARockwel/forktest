@@ -1,4 +1,4 @@
-"""
+""" 
 warehouse_diagnostics.py — Main entry point.
 
 To add a new scenario
