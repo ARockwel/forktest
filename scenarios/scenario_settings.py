@@ -21,8 +21,21 @@ _ROOT          = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PLANTS_PATH   = os.path.join(_ROOT, "plants.json")
 _BU_PATH       = os.path.join(_ROOT, "business_units.json")
 _ICONS_PATH    = os.path.join(_ROOT, "icons.json")
+_SETTINGS_PATH = os.path.join(_ROOT, "settings.json")
+
+_DEFAULT_SETTINGS = {
+    "version_check_repo": "https://github.com/ARockwel/Warehouse-Diagnostic-Tool",
+}
 
 _ENVIRONMENTS = ["PROD", "QA", "IWS"]
+
+
+def load_settings() -> dict:
+    try:
+        with open(_SETTINGS_PATH, 'r', encoding='utf-8') as f:
+            return {**_DEFAULT_SETTINGS, **json.load(f)}
+    except Exception:
+        return dict(_DEFAULT_SETTINGS)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -168,9 +181,10 @@ class ScenarioSettings(tk.Frame):
         super().__init__(parent, **kw)
         self._log              = log
         self._on_settings_saved = on_settings_saved
-        self._plants: list[dict] = []
-        self._bus:    list[str]  = []
-        self._icons:  list[str]  = []
+        self._plants:   list[dict] = []
+        self._bus:      list[str]  = []
+        self._icons:    list[str]  = []
+        self._settings: dict       = dict(_DEFAULT_SETTINGS)
         self._build()
         self._load()
 
@@ -192,9 +206,15 @@ class ScenarioSettings(tk.Frame):
                 self._icons = json.load(f)
         except Exception:
             self._icons = ["◈","⚙","🔍","🔧","⚠","📦","🚚","🏭","📋","🔑","⬡","🗂","📊","🔗","⛓","🛠","🧩","📌","🔄","✅"]
+        try:
+            with open(_SETTINGS_PATH, 'r', encoding='utf-8') as f:
+                self._settings = {**_DEFAULT_SETTINGS, **json.load(f)}
+        except Exception:
+            self._settings = dict(_DEFAULT_SETTINGS)
         self._refresh_plants_list()
         self._refresh_bu_list()
         self._refresh_icons_list()
+        self._refresh_settings()
 
     def _save(self):
         try:
@@ -218,7 +238,15 @@ class ScenarioSettings(tk.Frame):
             messagebox.showerror("Save Failed", f"Could not write icons.json:\n{e}", parent=self)
             return
 
-        self._log.info("Settings saved — plants.json + business_units.json + icons.json updated.")
+        self._settings["version_check_repo"] = self._repo_var.get().strip()
+        try:
+            with open(_SETTINGS_PATH, 'w', encoding='utf-8') as f:
+                json.dump(self._settings, f, indent=2)
+        except Exception as e:
+            messagebox.showerror("Save Failed", f"Could not write settings.json:\n{e}", parent=self)
+            return
+
+        self._log.info("Settings saved — plants.json + business_units.json + icons.json + settings.json updated.")
         if self._on_settings_saved:
             self._on_settings_saved()
         messagebox.showinfo("Saved", "Settings saved successfully.", parent=self)
@@ -283,6 +311,26 @@ class ScenarioSettings(tk.Frame):
 
         self._icons_frame = tk.Frame(body, bg=PALETTE["surface"])
         self._icons_frame.pack(fill="x", pady=(0, 16))
+
+        separator(body).pack(fill="x", pady=(0, 12))
+
+        # ── Version Check Repo section ────────────────────────────────────
+        repo_hdr = tk.Frame(body, bg=PALETTE["surface"])
+        repo_hdr.pack(fill="x", pady=(0, 6))
+        styled_label(repo_hdr, "Version Check",
+                     font=FONT_HEAD, color=PALETTE["accent_text"]).pack(side="left")
+
+        styled_label(body,
+                     "Full URL of the GitHub repo to check for updates. "
+                     "Set this to your team's fork.",
+                     font=FONT_SMALL, color=PALETTE["text_dim"]).pack(anchor="w", pady=(0, 6))
+
+        repo_row = tk.Frame(body, bg=PALETTE["surface"])
+        repo_row.pack(fill="x", pady=(0, 16))
+        self._repo_var = tk.StringVar()
+        repo_entry = styled_entry(repo_row, width=40)
+        repo_entry.config(textvariable=self._repo_var)
+        repo_entry.pack(fill="x", ipady=4)
 
         separator(body).pack(fill="x", pady=(0, 12))
 
@@ -462,3 +510,8 @@ class ScenarioSettings(tk.Frame):
     def _remove_icon(self, idx: int):
         del self._icons[idx]
         self._refresh_icons_list()
+
+    # ── Settings (version check repo) ─────────────────────────────────────
+
+    def _refresh_settings(self):
+        self._repo_var.set(self._settings.get("version_check_repo", ""))
